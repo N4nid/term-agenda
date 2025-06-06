@@ -5,13 +5,14 @@
 #include <sys/stat.h>
 
 char *org_agenda_files = NULL;
+char *configPath = NULL;
 
 void createConfig() {
   // create config file if necessary
   // linux only currently
 
   struct stat sfileInfo;
-  char *configPath = getenv("HOME");
+  configPath = getenv("HOME");
   strcat(configPath, "/.config/");
 
   if (stat(configPath, &sfileInfo) == -1) { // ~/.config dir doesnt exist
@@ -29,8 +30,25 @@ void createConfig() {
 }
 
 void readConfig() {
-  //  char *wow;
-  //  size_t size = 1;
+  FILE *file = fopen(configPath, "r");
+  char *line;
+  size_t size = 1;
+  int lineNum = 0;
+
+  if (file == NULL) {
+    printf("[!] error opening config file");
+  }
+
+  lineNum = getline(&line, &size, file);
+  while (lineNum >= 0) {
+    printf("%s", line);
+
+    lineNum = getline(&line, &size, file);
+  }
+
+  fclose(file);
+  mfree(line);
+
   //  wow = (char *)malloc(size * sizeof(char));
   //
   //  getline(&wow, &size, stdin);
@@ -46,7 +64,7 @@ void readConfig() {
 
 int main(int argc, char *argv[]) {
   createConfig();
-  // readConfig();
+  readConfig();
   //   printf("%s\n", org_agenda_files);
   //   mfree(org_agenda_files);
   return 0;
