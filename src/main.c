@@ -8,17 +8,17 @@ char *org_agenda_files;
 void readConfig() {
 
   char *wow;
-  size_t size = 0;
+  size_t size = 1;
+  wow = (char *)malloc(size * sizeof(char));
+
   getline(&wow, &size, stdin);
-  printf("size of wow %ld\n", sizeof(*wow));
+
+  printf("size of wow %ld\n", size);
   printf("%s", wow);
   printf("length of wow %ld\n", strlen(wow));
 
-  // org_agenda_files = calloc(, sizeof(int));
-  // org_agenda_files = calloc(sizeof(wow), sizeof(char));
   org_agenda_files = (char *)malloc(size);
   memcpy(org_agenda_files, wow, size);
-  printf("size of org_agenda_files %ld\n", sizeof(*org_agenda_files));
   mfree(wow);
 }
 

@@ -2,7 +2,6 @@
 #include <string.h>
 
 void mfree(void *ptr) {
-  // so that i cant forget to set the pointer to null
   free(ptr);
-  ptr = NULL;
+  ptr = NULL; // so that the pointer cant be used accidentally
 }
