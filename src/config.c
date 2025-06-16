@@ -8,11 +8,13 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 char *configPath = NULL;
+int agenda_files_amount = -1;
 // config options:
 // replace "_" with "-" for conf value. eg. cache_dir = cache-dir (in conf file)
 char **org_agenda_files = NULL;
-int agenda_files_amount = -1;
 char *cache_dir = NULL;
+int max_threads = 10;    // TODO document default
+int tag_inheritance = 1; // 1 true, 0 false
 
 void addAgendaFiles(char *path) {
   path = fixPath(path);
@@ -70,7 +72,8 @@ void addAgendaFiles(char *path) {
 }
 
 void setConfigValue(char *optionString) {
-  char *options[] = {"org-agenda-files:", "cache-dir:"}; // ! have to end in =
+  char *options[] = {
+      "org-agenda-files:", "cache-dir:", "max-threads:"}; // ! have to end in =
   int optionIndex = -1;
   int inputStrLen = strlen(optionString);
   int optionLen = -1;
@@ -111,6 +114,10 @@ void setConfigValue(char *optionString) {
     free(optionValue);
     optionValue = NULL;
     break;
+  case 2: // max_threads
+    max_threads = atoi(optionValue);
+    free(optionValue);
+    break;
   }
 }
 
@@ -122,6 +129,7 @@ void readConfig() {
 
   if (file == NULL) {
     printf("[!] error opening config file");
+    fclose(file);
   }
 
   lineNum = getline(&line, &size, file);
