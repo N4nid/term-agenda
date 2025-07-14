@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 struct headingMeta {
   char *name;
@@ -42,7 +43,7 @@ void scanFile(char *path) {
 
   FILE *file = fopen(path, "r");
   char *line;
-  size_t size = 1;
+  size_t size = 0;
   int lineNum = 0;
 
   if (file == NULL) {

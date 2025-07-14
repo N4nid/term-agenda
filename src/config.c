@@ -124,7 +124,7 @@ void setConfigValue(char *optionString) {
 void readConfig() {
   FILE *file = fopen(configPath, "r");
   char *line;
-  size_t size = 1;
+  size_t size = 0; // should automatically be resized by getline
   int lineNum = 0;
 
   if (file == NULL) {
@@ -173,5 +173,7 @@ void createConfig() {
     printf("[i] configPath: %s \n", configPath);
 
     fopen(configPath, "w");
+  } else {
+    printf("config exists: %s \n", configPath);
   }
 }
