@@ -1,4 +1,5 @@
 #include "config.c"
+#include <ctype.h>
 #include <sched.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -7,9 +8,9 @@
 #include <unistd.h>
 
 struct headingMeta {
-  size_t totalSize;
   char *name;
   char **tags;
+  size_t tagsAmount;
   char *todokwd; // fe. TODO, DONE
   char *scheduled;
   char *deadline;
@@ -81,6 +82,14 @@ void freeFileMeta(struct fileMeta file) {
       free(file.headings[i].todokwd);
       file.headings[i].todokwd = NULL;
     }
+    // printf("  tagAmount: %ld\n", file.headings[i].tagsAmount);
+    for (int j = 0; j < file.headings[i].tagsAmount; j++) {
+      printf("  tag: %s\n", file.headings[i].tags[j]);
+      free(file.headings[i].tags[j]);
+      file.headings[i].tags[j] = NULL;
+    }
+    free(file.headings[i].tags);
+    file.headings[i].tags = NULL;
   }
   free(file.headings);
   file.headings = NULL;
@@ -101,6 +110,55 @@ char *getTodoKeyw(char *heading, size_t *todoKwdSize) {
   }
 
   return NULL;
+}
+
+char **getTags(char *heading, size_t *amount) {
+  size_t headingLen = strlen(heading);
+  char **tagArray = NULL;
+  int between = 0;
+  int startPos = -1;
+  int endPos = -1;
+  int counter = 0;
+
+  for (int i = 0; i < headingLen; i++) {
+    // printf("%c", current);
+    if (heading[i] == ':') {
+      if (between == 1) { // has found a tag
+        between = 0;
+        endPos = i;
+        i--; // so that the : can get used as a starting point for further
+             // potential tags (:asd:wow:)
+
+        char **tmp = realloc(tagArray, sizeof(tagArray) * (counter + 1));
+        if (tmp) { // TODO handel failure
+          tagArray = tmp;
+        }
+
+        size_t tagSize = endPos - startPos;
+        tagArray[counter] = malloc(tagSize + 1);
+        memcpy(tagArray[counter], heading + startPos + 1, tagSize);
+        tagArray[counter][tagSize - 1] = '\0';
+        // printf("TAGS: %s\n", tagArray[counter]);
+
+        counter++;
+      } else {
+        startPos = i;
+        between = 1;
+      }
+    }
+
+    if (between == 1) {
+      if (isspace(heading[i])) {
+        // reset since :wow : is not a valid tag
+        // there are more characters which would make a tag invalid, but i dont
+        // see it as necessary to include those cases. Atleast for now
+        between = 0;
+      }
+    }
+  }
+
+  *amount = counter;
+  return tagArray;
 }
 
 void scanFile(char *path) {
@@ -141,12 +199,22 @@ void scanFile(char *path) {
       size_t todoKwdSize;
       char *todoKwd = getTodoKeyw(lineWithoutAsterisk, &todoKwdSize);
       if (todoKwd != NULL) {
-        printf("size: %ld\n", todoKwdSize);
+        // printf("size: %ld\n", todoKwdSize);
         thisFile.headings[headingCount].todokwd = malloc(todoKwdSize);
         memcpy(thisFile.headings[headingCount].todokwd, todoKwd, todoKwdSize);
         printf("todo: %s\n", thisFile.headings[headingCount].todokwd);
       } else { // has to be NULL since it by default points somewhere else.
         thisFile.headings[headingCount].todokwd = NULL;
+      }
+
+      size_t tagAmount = -1;
+      thisFile.headings[headingCount].tags =
+          getTags(lineWithoutAsterisk, &tagAmount);
+      thisFile.headings[headingCount].tagsAmount = tagAmount;
+      // printf("  tagAmount: %ld\n",
+      // thisFile.headings[headingCount].tagsAmount);
+      for (int j = 0; j < thisFile.headings[headingCount].tagsAmount; j++) {
+        printf("  tag: %s\n", thisFile.headings[headingCount].tags[j]);
       }
 
       printf("%s lvl:%d \n", thisFile.headings[headingCount].name, lvl);
