@@ -1,5 +1,6 @@
 #include "util.c"
 #include <dirent.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,13 +9,17 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 char *configPath = NULL;
+// helper vars
 int agenda_files_amount = -1;
+size_t todo_keywords_amount = -1;
 // config options:
 // replace "_" with "-" for conf value. eg. cache_dir = cache-dir (in conf file)
 char **org_agenda_files = NULL;
 char *cache_dir = NULL;
-int max_threads = 10;    // TODO document default
-int tag_inheritance = 1; // 1 true, 0 false
+int max_threads = 10;                 // TODO document default
+int tag_inheritance = 1;              // 1 true, 0 false
+char *todo_keywordsCSV = "TODO,DONE"; // comma seperated list of todo-keywords
+char **todo_keywords = NULL;
 
 void addAgendaFiles(char *path) {
   path = fixPath(path);
@@ -72,8 +77,8 @@ void addAgendaFiles(char *path) {
 }
 
 void setConfigValue(char *optionString) {
-  char *options[] = {
-      "org-agenda-files:", "cache-dir:", "max-threads:"}; // ! have to end in =
+  char *options[] = {"org-agenda-files:", "cache-dir:", "max-threads:",
+                     "todo-keywords:"}; // ! have to end in :
   int optionIndex = -1;
   int inputStrLen = strlen(optionString);
   int optionLen = -1;
@@ -117,6 +122,15 @@ void setConfigValue(char *optionString) {
   case 2: // max_threads
     max_threads = atoi(optionValue);
     free(optionValue);
+    optionValue = NULL;
+    break;
+  case 3: // todo_keywords
+    todo_keywords = split(optionValue, ",", &todo_keywords_amount);
+    //    for (int i = 0; i < todo_keywords_amount; i++) {
+    //      printf("%s\n", todo_keywords[i]);
+    //    }
+    free(optionValue);
+    optionValue = NULL;
     break;
   }
 }
@@ -144,6 +158,7 @@ void readConfig() {
   fclose(file);
   free(line);
   line = NULL;
+
   free(configPath);
   configPath = NULL;
 }

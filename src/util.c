@@ -1,6 +1,8 @@
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 char *fixPath(char *path) {
   int pathLen = strlen(path);
@@ -45,6 +47,31 @@ char *fixPath(char *path) {
     }
   }
   return path;
+}
+
+char **split(char *source, char *delimiter, size_t *size) {
+  char *token = strtok_r(source, delimiter, &source);
+  char **resultArray = NULL;
+  size_t counter = 0;
+
+  while (token != NULL) {
+    char **tmp = realloc(resultArray, sizeof(resultArray) * (counter + 1));
+    if (tmp) { // TODO handel failure
+      resultArray = tmp;
+    }
+
+    size_t tokeSize = strlen(token) + 1;
+    resultArray[counter] = malloc(tokeSize);
+    memcpy(resultArray[counter], token, tokeSize);
+    // printf("%s\n", resultArray[counter]);
+    //  printf("%s\n", token);
+
+    token = strtok_r(source, delimiter, &source);
+    counter++;
+  }
+  *size = counter;
+
+  return resultArray;
 }
 
 char *expandTilde(char *path) {

@@ -1,12 +1,9 @@
-#include "config.c"
 #include "scan.c"
 #include <pthread.h>
-#include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 void freeAllGlobals() {
-
   for (int i = 0; i < agenda_files_amount; i++) {
     // printf("%s\n", org_agenda_files[i]);
     free(org_agenda_files[i]);
@@ -17,6 +14,15 @@ void freeAllGlobals() {
   // printf("%s\n", cache_dir);
   free(cache_dir);
   cache_dir = NULL;
+
+  for (int i = 0; i < todo_keywords_amount; i++) {
+    // printf("%s\n", org_agenda_files[i]);
+    free(todo_keywords[i]);
+    todo_keywords[i] = NULL;
+  }
+
+  free(todo_keywords);
+  todo_keywords = NULL;
 }
 
 // void testThreads() {

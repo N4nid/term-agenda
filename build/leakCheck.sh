@@ -1,7 +1,7 @@
 #!/bin/bash
 # requires valgrind
 
-bash build.sh
+gcc -o term-agenda ../src/main.c
 
 valgrind ./term-agenda
 #valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose ./term-agenda
