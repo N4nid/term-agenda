@@ -77,8 +77,9 @@ void addAgendaFiles(char *path) {
 }
 
 void setConfigValue(char *optionString) {
-  char *options[] = {"org-agenda-files:", "cache-dir:", "max-threads:",
-                     "todo-keywords:"}; // ! have to end in :
+  char *options[] = {
+      "org-agenda-files:", "cache-dir:", "max-threads:", "todo-keywords:",
+      "tag-inheritance:"}; // ! have to end in :
   int optionIndex = -1;
   int inputStrLen = strlen(optionString);
   int optionLen = -1;
@@ -129,6 +130,11 @@ void setConfigValue(char *optionString) {
     //    for (int i = 0; i < todo_keywords_amount; i++) {
     //      printf("%s\n", todo_keywords[i]);
     //    }
+    free(optionValue);
+    optionValue = NULL;
+    break;
+  case 4: // tag_inheritance
+    tag_inheritance = atoi(optionValue);
     free(optionValue);
     optionValue = NULL;
     break;

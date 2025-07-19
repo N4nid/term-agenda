@@ -8,9 +8,12 @@
 #include <unistd.h>
 
 struct headingMeta {
+  int lvl; // the heading lvl (eg. how many "*" there are)
   char *name;
   char **tags;
+  char **inherited_tags;
   size_t tagsAmount;
+  size_t inherited_tagsAmount;
   char *todokwd; // fe. TODO, DONE
   char *scheduled;
   char *deadline;
@@ -82,7 +85,8 @@ void freeFileMeta(struct fileMeta file) {
       free(file.headings[i].todokwd);
       file.headings[i].todokwd = NULL;
     }
-    // printf("  tagAmount: %ld\n", file.headings[i].tagsAmount);
+
+    printf("  tagAmount: %ld\n", file.headings[i].tagsAmount);
     for (int j = 0; j < file.headings[i].tagsAmount; j++) {
       printf("  tag: %s\n", file.headings[i].tags[j]);
       free(file.headings[i].tags[j]);
@@ -161,6 +165,50 @@ char **getTags(char *heading, size_t *amount) {
   return tagArray;
 }
 
+void setInheritedTags(int currentIndex, struct fileMeta file, int lvl) {
+  if ((currentIndex - 1) >= 0 && lvl > 1) {
+    // dont have to search if already top lvl
+    // linear search upwards to find first "parent" to inherit from
+    // printf("  own LVL: %d\n", lvl);
+    for (int i = currentIndex - 1; i >= 0; i--) {
+      // printf("  searching: %s", file.headings[i].name);
+      if (lvl > file.headings[i].lvl) {
+        // printf("  found: %d %s", file.headings[i].lvl,
+        // file.headings[i].name);
+        //  set inherited_tags
+
+        size_t thisTagsAmount = file.headings[currentIndex].tagsAmount;
+        size_t otherTagsAmount = file.headings[i].tagsAmount;
+        size_t newAmount = thisTagsAmount + otherTagsAmount;
+
+        char **tmp = realloc(file.headings[currentIndex].tags,
+                             newAmount * sizeof(char *));
+
+        if (tmp) { // TODO add failure handeling
+          file.headings[currentIndex].tags = tmp;
+          for (int j = thisTagsAmount; j < newAmount; j++) {
+            size_t tagSize =
+                strlen(file.headings[i].tags[j - thisTagsAmount]) + 1;
+
+            file.headings[currentIndex].tags[j] = malloc(tagSize);
+
+            memcpy(file.headings[currentIndex].tags[j],
+                   file.headings[i].tags[j - thisTagsAmount], tagSize);
+          }
+
+          file.headings[currentIndex].tagsAmount = newAmount;
+        }
+
+        //        for (int j = 0; j < newAmount; j++) {
+        //          printf("test---------- %s\n",
+        //          file.headings[currentIndex].tags[j]);
+        //        }
+        break;
+      }
+    }
+  }
+}
+
 void scanFile(char *path) {
   if (path == NULL) {
     return;
@@ -196,6 +244,7 @@ void scanFile(char *path) {
       memcpy(thisFile.headings[headingCount].name, lineWithoutAsterisk,
              newsize);
 
+      // handle todokwd
       size_t todoKwdSize;
       char *todoKwd = getTodoKeyw(lineWithoutAsterisk, &todoKwdSize);
       if (todoKwd != NULL) {
@@ -207,6 +256,7 @@ void scanFile(char *path) {
         thisFile.headings[headingCount].todokwd = NULL;
       }
 
+      // handle tags
       size_t tagAmount = -1;
       thisFile.headings[headingCount].tags =
           getTags(lineWithoutAsterisk, &tagAmount);
@@ -217,7 +267,14 @@ void scanFile(char *path) {
         printf("  tag: %s\n", thisFile.headings[headingCount].tags[j]);
       }
 
-      printf("%s lvl:%d \n", thisFile.headings[headingCount].name, lvl);
+      // set own lvl
+      printf("- %s lvl:%d \n", thisFile.headings[headingCount].name, lvl);
+      thisFile.headings[headingCount].lvl = lvl;
+
+      // add inherited_tags
+      if (tag_inheritance == 1) {
+        setInheritedTags(headingCount, thisFile, lvl);
+      }
 
       headingCount++;
     }
