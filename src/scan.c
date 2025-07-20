@@ -1,4 +1,5 @@
 #include "config.c"
+#include "util.h"
 #include <ctype.h>
 #include <sched.h>
 #include <stddef.h>
@@ -6,24 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-struct headingMeta {
-  int lvl; // the heading lvl (eg. how many "*" there are)
-  char *name;
-  char **tags;
-  char **inherited_tags;
-  size_t tagsAmount;
-  size_t inherited_tagsAmount;
-  char *todokwd; // fe. TODO, DONE
-  char *scheduled;
-  char *deadline;
-  char **properties;
-};
-struct fileMeta {
-  char *path;
-  int headingCount;
-  struct headingMeta *headings; // array of heading meta data
-};
 
 int getHeadingLvl(char *headline) {
   // returns the amount of "*" in front of a heading
@@ -209,9 +192,12 @@ void setInheritedTags(int currentIndex, struct fileMeta file, int lvl) {
   }
 }
 
-void scanFile(char *path) {
+// struct fileMeta scanFile(char *path) {
+void *scanFile(void *path) {
+  struct fileMeta thisFile;
   if (path == NULL) {
-    return;
+    thisFile.isInitialized = 0;
+    return NULL;
   }
 
   FILE *file = fopen(path, "r");
@@ -228,7 +214,6 @@ void scanFile(char *path) {
   int headingCount = 0;
   int totalHeadingsCount = countHeadings(path);
 
-  struct fileMeta thisFile;
   thisFile.headings = malloc(sizeof(struct headingMeta) * totalHeadingsCount);
   thisFile.headingCount = totalHeadingsCount;
 
@@ -284,10 +269,13 @@ void scanFile(char *path) {
   fclose(file);
   printf("------------\n");
 
-  freeFileMeta(thisFile);
+  // freeFileMeta(thisFile);
 
   free(line);
   line = NULL;
 
   printf("%s\n", path);
+  thisFile.isInitialized = 1;
+  // return thisFile;
+  return NULL;
 }
