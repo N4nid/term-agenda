@@ -1,6 +1,8 @@
 #include "scan.c"
 #include "util.h"
+#include <assert.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -30,21 +32,24 @@ void testThreads() {
   // see vvv for more info
   // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/ThreadArgs.html
 
-  int max = 2;
+  int max = agenda_files_amount;
   pthread_t threads[max];
-  pthread_create(&threads[0], NULL, scanFile, (void *)org_agenda_files[0]);
-  pthread_create(&threads[1], NULL, scanFile, (void *)org_agenda_files[1]);
-  pthread_join(threads[1], NULL);
-  pthread_join(threads[0], NULL);
-  //  for (int i = 1; i < max; i++) {
-  //    printf("starting: %d\n", i);
-  //    // pthread_create(&threads[i], NULL, test1, &i);
-  //  }
-  //  for (int j = 1; j < max; j++) {
-  //    printf("waiting for: %d\n", j);
-  //    pthread_join(threads[j], NULL);
-  //  }
-  // pthread_create(&threads[0], NULL, test1, test);
+  struct fileMeta files[agenda_files_amount];
+  struct threadWrapper tw[agenda_files_amount];
+
+  printf("------ agendafiel amount: %d\n", max);
+  for (int i = 0; i < max; i++) {
+    printf("starting: %d\n", i);
+    tw[i].agendaFilePath = org_agenda_files[i];
+    pthread_create(&threads[i], NULL, scanFile, (void *)&tw[i]);
+  }
+  for (int j = 0; j < max; j++) {
+    printf("waiting for: %d\n", j);
+    pthread_join(threads[j], NULL);
+
+    files[j] = tw[j].returnMeta;
+    freeFileMeta(files[j]);
+  }
 }
 
 int main(int argc, char *argv[]) {

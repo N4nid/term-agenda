@@ -1,6 +1,7 @@
 #include "config.c"
 #include "util.h"
 #include <ctype.h>
+#include <pthread.h>
 #include <sched.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -56,6 +57,7 @@ int countHeadings(char *path) {
 }
 
 void freeFileMeta(struct fileMeta file) {
+
   for (int i = 0; i < file.headingCount; i++) {
     if (file.headings[i].name != NULL) {
       printf("name: %s", file.headings[i].name);
@@ -193,8 +195,12 @@ void setInheritedTags(int currentIndex, struct fileMeta file, int lvl) {
 }
 
 // struct fileMeta scanFile(char *path) {
-void *scanFile(void *path) {
+// void *scanFile(void *path) {
+void *scanFile(void *threadWrapperStruct) {
+  struct threadWrapper *tw = (struct threadWrapper *)threadWrapperStruct;
+  char *path = tw->agendaFilePath;
   struct fileMeta thisFile;
+  // struct fileMeta thisFile;
   if (path == NULL) {
     thisFile.isInitialized = 0;
     return NULL;
@@ -276,6 +282,8 @@ void *scanFile(void *path) {
 
   printf("%s\n", path);
   thisFile.isInitialized = 1;
+  tw->returnMeta = thisFile;
   // return thisFile;
   return NULL;
+  // pthread_exit(&thisFile);
 }
