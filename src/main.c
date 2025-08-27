@@ -32,23 +32,36 @@ void testThreads() {
   // see vvv for more info
   // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/ThreadArgs.html
 
-  int max = agenda_files_amount;
+  int max = max_threads;
   pthread_t threads[max];
   struct fileMeta files[agenda_files_amount];
   struct threadWrapper tw[agenda_files_amount];
 
-  printf("------ agendafiel amount: %d\n", max);
-  for (int i = 0; i < max; i++) {
-    printf("starting: %d\n", i);
-    tw[i].agendaFilePath = org_agenda_files[i];
-    pthread_create(&threads[i], NULL, scanFile, (void *)&tw[i]);
-  }
-  for (int j = 0; j < max; j++) {
-    printf("waiting for: %d\n", j);
-    pthread_join(threads[j], NULL);
+  printf("------ agendafile amount: %d\n", agenda_files_amount);
+  printf("------ maxThreads: %d\n", max);
 
-    files[j] = tw[j].returnMeta;
-    freeFileMeta(files[j]);
+  for (int filesScanned = 0; filesScanned < agenda_files_amount;
+       filesScanned += max) {
+
+    // as to not go out of bounds -> set max to files left
+    if ((agenda_files_amount - filesScanned) < max) {
+      max = (agenda_files_amount - filesScanned);
+    }
+
+    // start threads
+    for (int i = filesScanned; i < (filesScanned + max); i++) {
+      printf("## starting: %d\n", i);
+      tw[i].agendaFilePath = org_agenda_files[i];
+      pthread_create(&threads[i], NULL, scanFile, (void *)&tw[i]);
+    }
+    // collect results
+    for (int j = filesScanned; j < (filesScanned + max); j++) {
+      printf("++ waiting for: %d\n", j);
+      pthread_join(threads[j], NULL);
+
+      files[j] = tw[j].returnMeta;
+      freeFileMeta(files[j]);
+    }
   }
 }
 
