@@ -34,30 +34,40 @@ void testThreads() {
 
   int max = max_threads;
   pthread_t threads[max];
+  int threadIndex = 0;
+
   struct fileMeta files[agenda_files_amount];
   struct threadWrapper tw[agenda_files_amount];
 
   printf("------ agendafile amount: %d\n", agenda_files_amount);
-  printf("------ maxThreads: %d\n", max);
 
   for (int filesScanned = 0; filesScanned < agenda_files_amount;
        filesScanned += max) {
 
     // as to not go out of bounds -> set max to files left
+    printf(" ++++++-- diff:%d\n", (agenda_files_amount - filesScanned));
     if ((agenda_files_amount - filesScanned) < max) {
       max = (agenda_files_amount - filesScanned);
+      printf(" ++++++-- ADJUSTED\n");
     }
 
     // start threads
     for (int i = filesScanned; i < (filesScanned + max); i++) {
       printf("## starting: %d\n", i);
+
+      // since the threads array only has "max" size
+      threadIndex = i - filesScanned;
+
       tw[i].agendaFilePath = org_agenda_files[i];
-      pthread_create(&threads[i], NULL, scanFile, (void *)&tw[i]);
+      pthread_create(&threads[threadIndex], NULL, scanFile, (void *)&tw[i]);
     }
     // collect results
     for (int j = filesScanned; j < (filesScanned + max); j++) {
       printf("++ waiting for: %d\n", j);
-      pthread_join(threads[j], NULL);
+
+      // since the threads array only has "max" size
+      threadIndex = j - filesScanned;
+      pthread_join(threads[threadIndex], NULL);
 
       files[j] = tw[j].returnMeta;
       freeFileMeta(files[j]);

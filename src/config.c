@@ -15,6 +15,7 @@ size_t todo_keywords_amount = -1;
 // config options:
 // replace "_" with "-" for conf value. eg. cache_dir = cache-dir (in conf file)
 char **org_agenda_files = NULL;
+int recursive_adding = 10; // TODO document default
 char *cache_dir = NULL;
 int max_threads = 10;                 // TODO document default
 int tag_inheritance = 1;              // 1 true, 0 false
@@ -36,32 +37,52 @@ void addAgendaFiles(char *path) {
     struct dirent *ent;
 
     if ((dir = opendir(path)) != NULL) {
-      int counter = 0;
-      org_agenda_files = malloc(1 * sizeof(char));
+      if (org_agenda_files == NULL) {
+        org_agenda_files = malloc(sizeof(char *));
+      }
+      size_t size;
+
+      if (agenda_files_amount == -1) { // could already be set due to recursion
+        agenda_files_amount = 0;
+      }
 
       while ((ent = readdir(dir)) != NULL) {
         char *extension = ent->d_name;
         int filenameLen = strlen(extension);
         extension = extension + (filenameLen - 4);
 
-        if (strcmp(extension, ".org") == 0) { // is a org file
+        if (strncmp(extension, ".org", 4) == 0) { // is a org file
+          printf(" ---- FILE:%s\n", ent->d_name);
           // resize array
-          char **tmp = realloc(org_agenda_files,
-                               (counter + 1) * sizeof(org_agenda_files));
+          size = (agenda_files_amount + 1) * sizeof(org_agenda_files);
+          char **tmp = realloc(org_agenda_files, size);
           if (tmp) {
             org_agenda_files = tmp;
           }
 
-          org_agenda_files[counter] =
+          org_agenda_files[agenda_files_amount] =
               calloc(pathLen + filenameLen, sizeof(char));
-          strncat(org_agenda_files[counter], path, pathLen);
-          strncat(org_agenda_files[counter], ent->d_name, filenameLen);
+          strncat(org_agenda_files[agenda_files_amount], path, pathLen);
+          strncat(org_agenda_files[agenda_files_amount], ent->d_name,
+                  filenameLen);
 
-          counter++;
+          agenda_files_amount++;
+        } // is a dir (exclude "." and "..")
+        else if (ent->d_type == DT_DIR && strncmp(ent->d_name, "..", 3) != 0 &&
+                 strncmp(ent->d_name, ".", 2) != 0 && recursive_adding == 1) {
+
+          printf(" -------- DIR:%s\n", ent->d_name);
+          char *newPath = calloc(pathLen + filenameLen, sizeof(char));
+          strncat(newPath, path, pathLen);
+          strncat(newPath, ent->d_name, filenameLen);
+          printf(" -------- DIRPATH:%s\n", newPath);
+
+          addAgendaFiles(newPath);
+          newPath = NULL;
         }
       }
+
       closedir(dir);
-      agenda_files_amount = counter;
     }
   } else { // is a file
     org_agenda_files = malloc(1 * sizeof(org_agenda_files));
@@ -78,8 +99,8 @@ void addAgendaFiles(char *path) {
 
 void setConfigValue(char *optionString) {
   char *options[] = {
-      "org-agenda-files:", "cache-dir:", "max-threads:", "todo-keywords:",
-      "tag-inheritance:"}; // ! have to end in :
+      "org-agenda-files:", "cache-dir:",       "max-threads:", "todo-keywords:",
+      "tag-inheritance:",  "recursive-adding:"}; // ! has to end in :
   int optionIndex = -1;
   int inputStrLen = strlen(optionString);
   int optionLen = -1;
@@ -124,6 +145,12 @@ void setConfigValue(char *optionString) {
     max_threads = atoi(optionValue);
     free(optionValue);
     optionValue = NULL;
+    if (max_threads <= 0) {
+      printf("\n*********************************\n* ! INVALID max-threads "
+             "VALUE ! *\n*********************************\n");
+      exit(-1);
+    }
+
     break;
   case 3: // todo_keywords
     todo_keywords = split(optionValue, ",", &todo_keywords_amount);
@@ -135,6 +162,11 @@ void setConfigValue(char *optionString) {
     break;
   case 4: // tag_inheritance
     tag_inheritance = atoi(optionValue);
+    free(optionValue);
+    optionValue = NULL;
+    break;
+  case 5: // recursive_adding
+    recursive_adding = atoi(optionValue);
     free(optionValue);
     optionValue = NULL;
     break;
