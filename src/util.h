@@ -9,7 +9,8 @@ struct headingMeta {
   char *todokwd; // fe. TODO, DONE
   char *scheduled;
   char *deadline;
-  char **properties;
+  char ***properties;
+  size_t propertiesAmount;
 };
 struct fileMeta {
   int isInitialized;

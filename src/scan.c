@@ -85,6 +85,19 @@ void freeFileMeta(struct fileMeta file) {
       file.headings[i].todokwd = NULL;
     }
 
+    printf("  propertiesAmount: %ld\n", file.headings[i].propertiesAmount);
+    for (int j = 0; j < file.headings[i].propertiesAmount; j++) {
+      for (int k = 0; k < 2; k++) {
+        printf(" %s", file.headings[i].properties[j][k]);
+        free(file.headings[i].properties[j][k]);
+        file.headings[i].properties[j][k] = NULL;
+      }
+      free(file.headings[i].properties[j]);
+      file.headings[i].properties[j] = NULL;
+    }
+    free(file.headings[i].properties);
+    file.headings[i].properties = NULL;
+
     printf("  tagAmount: %ld\n", file.headings[i].tagsAmount);
     for (int j = 0; j < file.headings[i].tagsAmount; j++) {
       printf("  tag: %s\n", file.headings[i].tags[j]);
@@ -249,8 +262,36 @@ char *getScheduledDate(char *line, char *kwd, size_t *dateSize) {
   return dateStr;
 }
 
-// struct fileMeta scanFile(char *path) {
-// void *scanFile(void *path) {
+char **getProperty(char *line, int lineLen) {
+  int index = -1;
+  char *key = NULL;
+  char *val = NULL;
+  char **KVarr = NULL;
+  for (int i = 1; i < lineLen; i++) {
+    if (line[i - 1] == ':' && line[i] == ' ') {
+      index = i;
+      break;
+    }
+  }
+  if (index == -1) {
+    return NULL;
+  }
+
+  KVarr = malloc(2 * sizeof(char *));
+
+  key = calloc(index - 1, sizeof(char));
+  val = calloc((lineLen - index), sizeof(char));
+  memcpy(key, line + 1, index - 2); // minus ": "
+  memcpy(val, line + index, lineLen - index);
+
+  KVarr[0] = key;
+  KVarr[1] = val;
+
+  // printf("key: %s\nval:%s", KVarr[0], KVarr[1]);
+
+  return KVarr;
+}
+
 void *scanFile(void *threadWrapperStruct) {
   struct threadWrapper *tw = (struct threadWrapper *)threadWrapperStruct;
   char *path = tw->agendaFilePath;
@@ -273,6 +314,10 @@ void *scanFile(void *threadWrapperStruct) {
     fclose(file);
   }
 
+  int parsingProperties = 0;
+  int propertiesCount = 0;
+  int hasResetPos = 0;
+
   fgetpos(file, &filePos);
   int headingLvl = -1;
   int headingCount = -1;
@@ -283,10 +328,13 @@ void *scanFile(void *threadWrapperStruct) {
   thisFile.headingCount = totalHeadingsCount;
 
   lineNum = getline(&line, &linesize, file);
+  int lvl = 0;
   while (lineNum >= 0) { // loop through file
-    int lvl = getHeadingLvl(line);
 
-    if (lvl > 0) { // is a heading
+    if (parsingProperties == 0)
+      lvl = getHeadingLvl(line);
+
+    if (lvl > 0 && parsingProperties == 0) { // is a heading
       headingCount++;
 
       // set thisFile.headings[i].name to line without the *
@@ -331,34 +379,81 @@ void *scanFile(void *threadWrapperStruct) {
       // initialize to NULL for this heading (to avoid issues in freeFileMeta())
       thisFile.headings[headingCount].deadline = NULL;
       thisFile.headings[headingCount].scheduled = NULL;
+      thisFile.headings[headingCount].propertiesAmount = 0;
+      thisFile.headings[headingCount].properties = NULL;
 
-    } else if (linesize >= 25) {
-      size_t dateSize;
-      char *dateSched = NULL;
-      char *dateDead = NULL;
-      dateSched = getScheduledDate(line, "SCHEDULED:", &dateSize);
-      dateDead = getScheduledDate(line, "SCHEDULED:", &dateSize);
-      if (dateSched != NULL) {
-        thisFile.headings[headingCount].scheduled =
-            calloc(dateSize, sizeof(char));
-        memcpy(thisFile.headings[headingCount].scheduled, dateSched,
-               dateSize - 1);
+    } else {
 
-        printf("scheduled: %s\n", thisFile.headings[headingCount].scheduled);
+      // check for ":properties:"
+      if (linesize >= 12 && parsingProperties == 0) {
+        if (strcasestr(line, ":properties:") != NULL) {
+          parsingProperties = 1;
+          fgetpos(file, &filePos);
+        }
+      } else {
+        // check for ":end:"
+        if (strcasestr(line, ":end:") != NULL) {
+          if (hasResetPos == 0) {
+            hasResetPos = 1;
 
-        free(dateSched);
-        dateSched = NULL;
+            thisFile.headings[headingCount].propertiesAmount = propertiesCount;
+            thisFile.headings[headingCount].properties =
+                calloc(propertiesCount, sizeof(char ***));
+
+            propertiesCount = 0; // reset so that it can be used as a index when
+                                 // going over the lines again
+            fsetpos(file, &filePos);
+
+          } else {
+            hasResetPos = 0;
+            parsingProperties = 0;
+          }
+
+        } else { // parse key value pairs
+          // assumes there is nothing before the key value pairs
+          if (':' == line[0]) {
+            // printf("%s", line);
+            if (hasResetPos == 1) {
+              char **KVpair = getProperty(line, linesize);
+              // printf("key: %s\nval:%s", KVpair[0], KVpair[1]);
+              thisFile.headings[headingCount].properties[propertiesCount] =
+                  KVpair;
+            }
+
+            propertiesCount++;
+          }
+        }
       }
-      if (dateDead != NULL) {
-        thisFile.headings[headingCount].deadline =
-            calloc(dateSize, sizeof(char));
-        memcpy(thisFile.headings[headingCount].deadline, dateDead,
-               dateSize - 1);
 
-        printf("deadline: %s\n", thisFile.headings[headingCount].deadline);
+      // handle scheduled dates
+      // 25 is the min of chars needed to have a valid scheduled syntax
+      // eg: "SCHEDULED:<"+dateLength+">"
+      if (linesize >= 25 && parsingProperties == 0) {
+        size_t dateSize;
+        char *dateSched = NULL;
+        char *dateDead = NULL;
+        dateSched = getScheduledDate(line, "SCHEDULED:", &dateSize);
+        dateDead = getScheduledDate(line, "SCHEDULED:", &dateSize);
+        if (dateSched != NULL) {
+          thisFile.headings[headingCount].scheduled =
+              calloc(dateSize, sizeof(char));
+          memcpy(thisFile.headings[headingCount].scheduled, dateSched,
+                 dateSize - 1);
 
-        free(dateDead);
-        dateDead = NULL;
+          printf("scheduled: %s\n", thisFile.headings[headingCount].scheduled);
+          free(dateSched);
+          dateSched = NULL;
+        }
+        if (dateDead != NULL) {
+          thisFile.headings[headingCount].deadline =
+              calloc(dateSize, sizeof(char));
+          memcpy(thisFile.headings[headingCount].deadline, dateDead,
+                 dateSize - 1);
+
+          printf("deadline: %s\n", thisFile.headings[headingCount].deadline);
+          free(dateDead);
+          dateDead = NULL;
+        }
       }
     }
 
