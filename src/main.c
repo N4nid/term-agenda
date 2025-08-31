@@ -23,6 +23,8 @@ void freeAllGlobals() {
     free(todo_keywords[i]);
     todo_keywords[i] = NULL;
   }
+  free(time_format);
+  time_format = NULL;
 
   free(todo_keywords);
   todo_keywords = NULL;
@@ -33,6 +35,9 @@ void testThreads() {
   // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/ThreadArgs.html
 
   int max = max_threads;
+  if (max_threads == 0) {
+    max = agenda_files_amount;
+  }
   pthread_t threads[max];
   int threadIndex = 0;
 
@@ -45,10 +50,8 @@ void testThreads() {
        filesScanned += max) {
 
     // as to not go out of bounds -> set max to files left
-    printf(" ++++++-- diff:%d\n", (agenda_files_amount - filesScanned));
     if ((agenda_files_amount - filesScanned) < max) {
       max = (agenda_files_amount - filesScanned);
-      printf(" ++++++-- ADJUSTED\n");
     }
 
     // start threads
@@ -59,8 +62,10 @@ void testThreads() {
       threadIndex = i - filesScanned;
 
       tw[i].agendaFilePath = org_agenda_files[i];
+      printf("--------- %s\n", org_agenda_files[i]);
       pthread_create(&threads[threadIndex], NULL, scanFile, (void *)&tw[i]);
     }
+
     // collect results
     for (int j = filesScanned; j < (filesScanned + max); j++) {
       printf("++ waiting for: %d\n", j);
@@ -78,6 +83,7 @@ void testThreads() {
 int main(int argc, char *argv[]) {
   createConfig();
   readConfig();
+  // printf("------ agendafile amount: %d\n", agenda_files_amount);
   testThreads();
 
   freeAllGlobals();

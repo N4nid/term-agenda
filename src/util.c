@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 
 char *fixPath(char *path) {
@@ -16,6 +17,8 @@ char *fixPath(char *path) {
     // add a leading / so the paths are right
     addLeadingSlash = 1;
     newSize = pathLen + 1;
+  } else {
+    newSize = pathLen;
   }
 
   // expandTilde
@@ -26,26 +29,33 @@ char *fixPath(char *path) {
   }
 
   if (newSize != -1) {
-    char *tmp = realloc(path, newSize);
+    char *tmp = calloc(newSize, sizeof(char));
     if (tmp) {
+      // save path in tmp2
+      char *tmp2 = calloc(pathLen + addLeadingSlash, sizeof(char));
+      // expandTilde acts as the offset
+      memcpy(tmp2, path + expandTilde, pathLen - expandTilde);
+
+      // path to homepath
+      memcpy(tmp, getenv("HOME"), homePathSize);
+      strncat(tmp, tmp2, pathLen); // append original path
+
+      struct stat sfileInfo;
+      stat(tmp, &sfileInfo);
+      if (addLeadingSlash == 1 && sfileInfo.st_mode & S_IFDIR) {
+        strncat(tmp, "/", 2);
+      }
+
+      free(tmp2);
+      free(path);
+      tmp2 = NULL;
+
       path = tmp;
-      if (addLeadingSlash == 1) {
-        pathLen += 1;
-        strncat(path, "/", pathLen);
-      }
-
-      if (expandTilde == 1) {
-        char *tmp2 = calloc(pathLen, sizeof(char)); // save path in tmp
-        memcpy(tmp2, path + 1, pathLen);
-
-        // path to homepath
-        memcpy(path, getenv("HOME"), homePathSize);
-        strncat(path, tmp2, pathLen); // append original path
-        free(tmp2);
-        tmp2 = NULL;
-      }
+    } else {
+      printf("---- FUCK\n");
     }
   }
+  printf("---- OUTPATH: %s\n", path);
   return path;
 }
 

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 int getHeadingLvl(char *headline) {
@@ -31,17 +32,17 @@ int getHeadingLvl(char *headline) {
   return -1;
 }
 
-int countHeadings(char *path) {
-  FILE *file = fopen(path, "r");
-  char *line;
+int countHeadings(FILE *file) {
+  char *line = NULL;
   size_t linesize = 0;
   int lineNum = 0;
   int headingLvl = -1;
   int headingCounter = 0;
+  int lvl = -1;
 
   lineNum = getline(&line, &linesize, file);
   while (lineNum >= 0) { // loop through file
-    int lvl = getHeadingLvl(line);
+    lvl = getHeadingLvl(line);
 
     if (lvl > 0) { // is a heading
       headingCounter++;
@@ -51,7 +52,7 @@ int countHeadings(char *path) {
   }
   free(line);
   line = NULL;
-  fclose(file);
+  // fclose(file);
 
   return headingCounter;
 }
@@ -59,10 +60,23 @@ int countHeadings(char *path) {
 void freeFileMeta(struct fileMeta file) {
 
   for (int i = 0; i < file.headingCount; i++) {
+
     if (file.headings[i].name != NULL) {
       printf("name: %s", file.headings[i].name);
       free(file.headings[i].name);
       file.headings[i].name = NULL;
+    }
+
+    if (file.headings[i].scheduled != NULL) {
+      printf("  scheduled: %s\n", file.headings[i].scheduled);
+      free(file.headings[i].scheduled);
+      file.headings[i].scheduled = NULL;
+    }
+
+    if (file.headings[i].deadline != NULL) {
+      printf("  deadline: %s\n", file.headings[i].deadline);
+      free(file.headings[i].deadline);
+      file.headings[i].deadline = NULL;
     }
 
     if (file.headings[i].todokwd != NULL) {
@@ -194,11 +208,53 @@ void setInheritedTags(int currentIndex, struct fileMeta file, int lvl) {
   }
 }
 
+// does not work if deadline and schedule are in the same line
+// well it misses one of them
+// kwd would be SCHEDULED: or DEADLINE:
+char *getScheduledDate(char *line, char *kwd, size_t *dateSize) {
+  char *position = NULL;
+  position = strstr(line, kwd);
+  if (position == NULL) {
+    return NULL;
+  }
+  // printf("-------------------- %s", position);
+  position = strstr(position, "<");
+  if (position == NULL) {
+    return NULL;
+  }
+  // printf("-------------------- %s", position);
+
+  int index = 0;
+  int found = -1;
+  char current = 'a';
+  while (current != '\n' || current != '\0') {
+    if (current == '>') {
+      found = index;
+      break;
+    }
+
+    index++;
+    current = position[index];
+  }
+
+  if (found == -1) {
+    return NULL;
+  }
+
+  *dateSize = index + 1;
+  char *dateStr = calloc(index + 1, sizeof(char));
+
+  strncat(dateStr, position + 1, index - 1);
+  // printf(" .........|%s|\n", dateStr);
+  return dateStr;
+}
+
 // struct fileMeta scanFile(char *path) {
 // void *scanFile(void *path) {
 void *scanFile(void *threadWrapperStruct) {
   struct threadWrapper *tw = (struct threadWrapper *)threadWrapperStruct;
   char *path = tw->agendaFilePath;
+
   struct fileMeta thisFile;
   // struct fileMeta thisFile;
   if (path == NULL) {
@@ -207,7 +263,8 @@ void *scanFile(void *threadWrapperStruct) {
   }
 
   FILE *file = fopen(path, "r");
-  char *line;
+  fpos_t filePos;
+  char *line = NULL;
   size_t linesize = 0;
   int lineNum = 0;
 
@@ -216,9 +273,11 @@ void *scanFile(void *threadWrapperStruct) {
     fclose(file);
   }
 
+  fgetpos(file, &filePos);
   int headingLvl = -1;
-  int headingCount = 0;
-  int totalHeadingsCount = countHeadings(path);
+  int headingCount = -1;
+  int totalHeadingsCount = countHeadings(file);
+  fsetpos(file, &filePos); // TODO handle failure ??
 
   thisFile.headings = malloc(sizeof(struct headingMeta) * totalHeadingsCount);
   thisFile.headingCount = totalHeadingsCount;
@@ -228,6 +287,8 @@ void *scanFile(void *threadWrapperStruct) {
     int lvl = getHeadingLvl(line);
 
     if (lvl > 0) { // is a heading
+      headingCount++;
+
       // set thisFile.headings[i].name to line without the *
       size_t newsize = linesize - (lvl + 1);
       char *lineWithoutAsterisk = line + lvl + 1;
@@ -242,7 +303,7 @@ void *scanFile(void *threadWrapperStruct) {
         // printf("size: %ld\n", todoKwdSize);
         thisFile.headings[headingCount].todokwd = malloc(todoKwdSize);
         memcpy(thisFile.headings[headingCount].todokwd, todoKwd, todoKwdSize);
-        printf("todo: %s\n", thisFile.headings[headingCount].todokwd);
+        printf(" todo: %s\n", thisFile.headings[headingCount].todokwd);
       } else { // has to be NULL since it by default points somewhere else.
         thisFile.headings[headingCount].todokwd = NULL;
       }
@@ -267,7 +328,38 @@ void *scanFile(void *threadWrapperStruct) {
         setInheritedTags(headingCount, thisFile, lvl);
       }
 
-      headingCount++;
+      // initialize to NULL for this heading (to avoid issues in freeFileMeta())
+      thisFile.headings[headingCount].deadline = NULL;
+      thisFile.headings[headingCount].scheduled = NULL;
+
+    } else if (linesize >= 25) {
+      size_t dateSize;
+      char *dateSched = NULL;
+      char *dateDead = NULL;
+      dateSched = getScheduledDate(line, "SCHEDULED:", &dateSize);
+      dateDead = getScheduledDate(line, "SCHEDULED:", &dateSize);
+      if (dateSched != NULL) {
+        thisFile.headings[headingCount].scheduled =
+            calloc(dateSize, sizeof(char));
+        memcpy(thisFile.headings[headingCount].scheduled, dateSched,
+               dateSize - 1);
+
+        printf("scheduled: %s\n", thisFile.headings[headingCount].scheduled);
+
+        free(dateSched);
+        dateSched = NULL;
+      }
+      if (dateDead != NULL) {
+        thisFile.headings[headingCount].deadline =
+            calloc(dateSize, sizeof(char));
+        memcpy(thisFile.headings[headingCount].deadline, dateDead,
+               dateSize - 1);
+
+        printf("deadline: %s\n", thisFile.headings[headingCount].deadline);
+
+        free(dateDead);
+        dateDead = NULL;
+      }
     }
 
     lineNum = getline(&line, &linesize, file);
@@ -280,7 +372,7 @@ void *scanFile(void *threadWrapperStruct) {
   free(line);
   line = NULL;
 
-  printf("%s\n", path);
+  // printf("%s\n", path);
   thisFile.isInitialized = 1;
   tw->returnMeta = thisFile;
   // return thisFile;
