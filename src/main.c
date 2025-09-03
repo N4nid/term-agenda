@@ -1,8 +1,9 @@
-#include "scan.c"
+#include "query.c"
 #include "util.h"
 #include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -85,6 +86,8 @@ int main(int argc, char *argv[]) {
   readConfig();
   // printf("------ agendafile amount: %d\n", agenda_files_amount);
   testThreads();
+  search("(TAG=='a' | TAG=='b') & (TAG=='c'|TAG=='d')");
+  //  search("TAG=='a' | !TAG=='b'");
 
   freeAllGlobals();
   return 0;

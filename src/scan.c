@@ -88,10 +88,11 @@ void freeFileMeta(struct fileMeta file) {
     printf("  propertiesAmount: %ld\n", file.headings[i].propertiesAmount);
     for (int j = 0; j < file.headings[i].propertiesAmount; j++) {
       for (int k = 0; k < 2; k++) {
-        printf(" %s", file.headings[i].properties[j][k]);
+        printf(" |%s|", file.headings[i].properties[j][k]);
         free(file.headings[i].properties[j][k]);
         file.headings[i].properties[j][k] = NULL;
       }
+      printf("\n");
       free(file.headings[i].properties[j]);
       file.headings[i].properties[j] = NULL;
     }
@@ -262,7 +263,8 @@ char *getScheduledDate(char *line, char *kwd, size_t *dateSize) {
   return dateStr;
 }
 
-char **getProperty(char *line, int lineLen) {
+char **getProperty(char *line) {
+  int lineLen = strlen(line);
   int index = -1;
   char *key = NULL;
   char *val = NULL;
@@ -279,15 +281,16 @@ char **getProperty(char *line, int lineLen) {
 
   KVarr = malloc(2 * sizeof(char *));
 
+  int delta = (lineLen - index) - 1;
   key = calloc(index - 1, sizeof(char));
   val = calloc((lineLen - index), sizeof(char));
   memcpy(key, line + 1, index - 2); // minus ": "
-  memcpy(val, line + index, lineLen - index);
+  memcpy(val, line + index + 1, delta - 1);
 
   KVarr[0] = key;
   KVarr[1] = val;
 
-  // printf("key: %s\nval:%s", KVarr[0], KVarr[1]);
+  // printf("key: %s\nval:%s\n", KVarr[0], KVarr[1]);
 
   return KVarr;
 }
@@ -414,7 +417,7 @@ void *scanFile(void *threadWrapperStruct) {
           if (':' == line[0]) {
             // printf("%s", line);
             if (hasResetPos == 1) {
-              char **KVpair = getProperty(line, linesize);
+              char **KVpair = getProperty(line);
               // printf("key: %s\nval:%s", KVpair[0], KVpair[1]);
               thisFile.headings[headingCount].properties[propertiesCount] =
                   KVpair;
