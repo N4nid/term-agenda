@@ -58,50 +58,60 @@ int countHeadings(FILE *file) {
 }
 
 void freeFileMeta(struct fileMeta file) {
+  int debug = 0;
 
   for (int i = 0; i < file.headingCount; i++) {
 
     if (file.headings[i].name != NULL) {
-      printf("name: %s", file.headings[i].name);
+      if (debug)
+        printf("name: %s", file.headings[i].name);
       free(file.headings[i].name);
       file.headings[i].name = NULL;
     }
 
     if (file.headings[i].scheduled != NULL) {
-      printf("  scheduled: %s\n", file.headings[i].scheduled);
+      if (debug)
+        printf("  scheduled: %s\n", file.headings[i].scheduled);
       free(file.headings[i].scheduled);
       file.headings[i].scheduled = NULL;
     }
 
     if (file.headings[i].deadline != NULL) {
-      printf("  deadline: %s\n", file.headings[i].deadline);
+      if (debug)
+        printf("  deadline: %s\n", file.headings[i].deadline);
       free(file.headings[i].deadline);
       file.headings[i].deadline = NULL;
     }
 
     if (file.headings[i].todokwd != NULL) {
-      printf("  todokwd: %s\n", file.headings[i].todokwd);
+      if (debug)
+        printf("  todokwd: %s\n", file.headings[i].todokwd);
       free(file.headings[i].todokwd);
       file.headings[i].todokwd = NULL;
     }
 
-    printf("  propertiesAmount: %ld\n", file.headings[i].propertiesAmount);
+    if (debug)
+      printf("  propertiesAmount: %ld\n", file.headings[i].propertiesAmount);
     for (int j = 0; j < file.headings[i].propertiesAmount; j++) {
       for (int k = 0; k < 2; k++) {
-        printf(" |%s|", file.headings[i].properties[j][k]);
+        if (debug)
+          printf(" |%s|", file.headings[i].properties[j][k]);
         free(file.headings[i].properties[j][k]);
         file.headings[i].properties[j][k] = NULL;
       }
-      printf("\n");
+      if (debug)
+        printf("\n");
       free(file.headings[i].properties[j]);
       file.headings[i].properties[j] = NULL;
     }
     free(file.headings[i].properties);
     file.headings[i].properties = NULL;
 
-    printf("  tagAmount: %ld\n", file.headings[i].tagsAmount);
+    if (debug)
+      printf("  tagAmount: %ld\n", file.headings[i].tagsAmount);
     for (int j = 0; j < file.headings[i].tagsAmount; j++) {
-      printf("  tag: %s\n", file.headings[i].tags[j]);
+      if (debug)
+        printf("  tag: %s\n", file.headings[i].tags[j]);
       free(file.headings[i].tags[j]);
       file.headings[i].tags[j] = NULL;
     }
@@ -266,6 +276,7 @@ char *getScheduledDate(char *line, char *kwd, size_t *dateSize) {
 char **getProperty(char *line) {
   int lineLen = strlen(line);
   int index = -1;
+  int valIndex = -1;
   char *key = NULL;
   char *val = NULL;
   char **KVarr = NULL;
@@ -278,19 +289,30 @@ char **getProperty(char *line) {
   if (index == -1) {
     return NULL;
   }
+  valIndex = index;
+
+  // skip leading spaces
+  if (' ' == line[index + 1]) {
+    for (int i = index; i < lineLen; i++) {
+      if (line[i] != ' ') {
+        valIndex = i - 1;
+        break;
+      }
+    }
+  }
 
   KVarr = malloc(2 * sizeof(char *));
 
   int delta = (lineLen - index) - 1;
   key = calloc(index - 1, sizeof(char));
-  val = calloc((lineLen - index), sizeof(char));
+  val = calloc((lineLen - valIndex), sizeof(char));
   memcpy(key, line + 1, index - 2); // minus ": "
-  memcpy(val, line + index + 1, delta - 1);
+  memcpy(val, line + valIndex + 1, (lineLen - valIndex) - 2);
 
   KVarr[0] = key;
   KVarr[1] = val;
 
-  // printf("key: %s\nval:%s\n", KVarr[0], KVarr[1]);
+  // printf("key:%s\nval:%s\n", KVarr[0], KVarr[1]);
 
   return KVarr;
 }
@@ -306,11 +328,15 @@ void *scanFile(void *threadWrapperStruct) {
     return NULL;
   }
 
+  thisFile.path = path;
+
   FILE *file = fopen(path, "r");
   fpos_t filePos;
   char *line = NULL;
   size_t linesize = 0;
-  int lineNum = 0;
+  int lineLen = 0;
+  int lineNum = 1;
+  int tmpLineNum = 0;
 
   if (file == NULL) {
     printf("[!] error opening file to be scanned");
@@ -330,15 +356,15 @@ void *scanFile(void *threadWrapperStruct) {
   thisFile.headings = malloc(sizeof(struct headingMeta) * totalHeadingsCount);
   thisFile.headingCount = totalHeadingsCount;
 
-  lineNum = getline(&line, &linesize, file);
+  lineLen = getline(&line, &linesize, file);
   int lvl = 0;
-  while (lineNum >= 0) { // loop through file
+  while (lineLen >= 0) { // loop through file
 
-    if (parsingProperties == 0)
-      lvl = getHeadingLvl(line);
+    lvl = getHeadingLvl(line);
 
     if (lvl > 0 && parsingProperties == 0) { // is a heading
       headingCount++;
+      thisFile.headings[headingCount].lineNum = lineNum;
 
       // set thisFile.headings[i].name to line without the *
       size_t newsize = linesize - (lvl + 1);
@@ -354,7 +380,7 @@ void *scanFile(void *threadWrapperStruct) {
         // printf("size: %ld\n", todoKwdSize);
         thisFile.headings[headingCount].todokwd = malloc(todoKwdSize);
         memcpy(thisFile.headings[headingCount].todokwd, todoKwd, todoKwdSize);
-        printf(" todo: %s\n", thisFile.headings[headingCount].todokwd);
+        // printf(" todo: %s\n", thisFile.headings[headingCount].todokwd);
       } else { // has to be NULL since it by default points somewhere else.
         thisFile.headings[headingCount].todokwd = NULL;
       }
@@ -367,11 +393,11 @@ void *scanFile(void *threadWrapperStruct) {
       // printf("  tagAmount: %ld\n",
       // thisFile.headings[headingCount].tagsAmount);
       for (int j = 0; j < thisFile.headings[headingCount].tagsAmount; j++) {
-        printf("  tag: %s\n", thisFile.headings[headingCount].tags[j]);
+        // printf("  tag: %s\n", thisFile.headings[headingCount].tags[j]);
       }
 
       // set own lvl
-      printf("- %s lvl:%d \n", thisFile.headings[headingCount].name, lvl);
+      // printf("- %s lvl:%d \n", thisFile.headings[headingCount].name, lvl);
       thisFile.headings[headingCount].lvl = lvl;
 
       // add inherited_tags
@@ -388,12 +414,14 @@ void *scanFile(void *threadWrapperStruct) {
     } else {
 
       // check for ":properties:"
-      if (linesize >= 12 && parsingProperties == 0) {
+      if (lineLen >= 12 && parsingProperties == 0 && headingCount >= 0) {
         if (strcasestr(line, ":properties:") != NULL) {
           parsingProperties = 1;
           fgetpos(file, &filePos);
+          tmpLineNum = lineNum;
+          propertiesCount = 0;
         }
-      } else {
+      } else if (parsingProperties) {
         // check for ":end:"
         if (strcasestr(line, ":end:") != NULL) {
           if (hasResetPos == 0) {
@@ -406,6 +434,7 @@ void *scanFile(void *threadWrapperStruct) {
             propertiesCount = 0; // reset so that it can be used as a index when
                                  // going over the lines again
             fsetpos(file, &filePos);
+            lineNum = tmpLineNum;
 
           } else {
             hasResetPos = 0;
@@ -418,7 +447,29 @@ void *scanFile(void *threadWrapperStruct) {
             // printf("%s", line);
             if (hasResetPos == 1) {
               char **KVpair = getProperty(line);
-              // printf("key: %s\nval:%s", KVpair[0], KVpair[1]);
+              if (KVpair == NULL) {
+                printf("\n---\n");
+                printf(" ! FAILED TO GET PROPERTY !\n");
+                printf(" is your org-mode syntax valid?\n");
+                printf(" failed @ line: %d in: %s\n", lineNum, path);
+                printf("---\n\n");
+
+                for (int i = 0; i < propertiesCount; i++) {
+                  free(thisFile.headings[headingCount].properties[i]);
+                  thisFile.headings[headingCount].properties[i] = NULL;
+                }
+
+                free(KVpair);
+                KVpair = NULL;
+                free(thisFile.headings[headingCount].properties);
+                thisFile.headings[headingCount].properties = NULL;
+                thisFile.headings[headingCount].propertiesAmount = 0;
+                parsingProperties = 0;
+                propertiesCount = 0;
+                hasResetPos = 0;
+                continue;
+              }
+              // printf("key: %s\nval:%s\n", KVpair[0], KVpair[1]);
               thisFile.headings[headingCount].properties[propertiesCount] =
                   KVpair;
             }
@@ -431,7 +482,7 @@ void *scanFile(void *threadWrapperStruct) {
       // handle scheduled dates
       // 25 is the min of chars needed to have a valid scheduled syntax
       // eg: "SCHEDULED:<"+dateLength+">"
-      if (linesize >= 25 && parsingProperties == 0) {
+      if (lineLen >= 25 && parsingProperties == 0 && headingCount >= 0) {
         size_t dateSize;
         char *dateSched = NULL;
         char *dateDead = NULL;
@@ -443,7 +494,8 @@ void *scanFile(void *threadWrapperStruct) {
           memcpy(thisFile.headings[headingCount].scheduled, dateSched,
                  dateSize - 1);
 
-          printf("scheduled: %s\n", thisFile.headings[headingCount].scheduled);
+          // printf("scheduled: %s\n",
+          // thisFile.headings[headingCount].scheduled);
           free(dateSched);
           dateSched = NULL;
         }
@@ -453,17 +505,18 @@ void *scanFile(void *threadWrapperStruct) {
           memcpy(thisFile.headings[headingCount].deadline, dateDead,
                  dateSize - 1);
 
-          printf("deadline: %s\n", thisFile.headings[headingCount].deadline);
+          // printf("deadline: %s\n", thisFile.headings[headingCount].deadline);
           free(dateDead);
           dateDead = NULL;
         }
       }
     }
 
-    lineNum = getline(&line, &linesize, file);
+    lineNum++;
+    lineLen = getline(&line, &linesize, file);
   }
   fclose(file);
-  printf("------------\n");
+  // printf("------------\n");
 
   // freeFileMeta(thisFile);
 

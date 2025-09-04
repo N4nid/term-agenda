@@ -55,7 +55,7 @@ char *fixPath(char *path) {
       printf("---- FUCK\n");
     }
   }
-  printf("---- OUTPATH: %s\n", path);
+  // printf("---- OUTPATH: %s\n", path);
   return path;
 }
 

@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+struct fileMeta *files;
+
 void freeAllGlobals() {
   for (int i = 0; i < agenda_files_amount; i++) {
     // printf("%s\n", org_agenda_files[i]);
@@ -29,9 +31,15 @@ void freeAllGlobals() {
 
   free(todo_keywords);
   todo_keywords = NULL;
+
+  for (int i = 0; i < agenda_files_amount; i++) {
+    freeFileMeta(files[i]);
+  }
+  free(files);
+  files = NULL;
 }
 
-void testThreads() {
+void scanFiles() {
   // see vvv for more info
   // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/ThreadArgs.html
 
@@ -42,10 +50,10 @@ void testThreads() {
   pthread_t threads[max];
   int threadIndex = 0;
 
-  struct fileMeta files[agenda_files_amount];
+  files = calloc(agenda_files_amount, sizeof(struct fileMeta));
   struct threadWrapper tw[agenda_files_amount];
 
-  printf("------ agendafile amount: %d\n", agenda_files_amount);
+  // printf("------ agendafile amount: %d\n", agenda_files_amount);
 
   for (int filesScanned = 0; filesScanned < agenda_files_amount;
        filesScanned += max) {
@@ -57,26 +65,25 @@ void testThreads() {
 
     // start threads
     for (int i = filesScanned; i < (filesScanned + max); i++) {
-      printf("## starting: %d\n", i);
+      // printf("## starting: %d\n", i);
 
       // since the threads array only has "max" size
       threadIndex = i - filesScanned;
 
       tw[i].agendaFilePath = org_agenda_files[i];
-      printf("--------- %s\n", org_agenda_files[i]);
+      // printf("--------- %s\n", org_agenda_files[i]);
       pthread_create(&threads[threadIndex], NULL, scanFile, (void *)&tw[i]);
     }
 
     // collect results
     for (int j = filesScanned; j < (filesScanned + max); j++) {
-      printf("++ waiting for: %d\n", j);
+      // printf("++ waiting for: %d\n", j);
 
       // since the threads array only has "max" size
       threadIndex = j - filesScanned;
       pthread_join(threads[threadIndex], NULL);
 
       files[j] = tw[j].returnMeta;
-      freeFileMeta(files[j]);
     }
   }
 }
@@ -85,9 +92,11 @@ int main(int argc, char *argv[]) {
   createConfig();
   readConfig();
   // printf("------ agendafile amount: %d\n", agenda_files_amount);
-  testThreads();
-  search("(TAG=='a' | TAG=='b') & (TAG=='c'|TAG=='d')");
-  //  search("TAG=='a' | !TAG=='b'");
+  scanFiles();
+  char *s = "PROP==['state':'wip']";
+  // char *s = "TAG=='a'";
+  //  char *s = "!(TAG=='a' | TAG=='b') & (TAG=='c'|TAG=='d')";
+  search(s, files);
 
   freeAllGlobals();
   return 0;

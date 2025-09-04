@@ -2,6 +2,7 @@
 #define UTIL_H
 #include <stddef.h>
 struct headingMeta {
+  int lineNum;
   int lvl; // the heading lvl (eg. how many "*" there are)
   char *name;
   char **tags;
@@ -11,6 +12,9 @@ struct headingMeta {
   char *deadline;
   char ***properties;
   size_t propertiesAmount;
+
+  // is later set in toFlatArray()
+  char *path;
 };
 struct fileMeta {
   int isInitialized;

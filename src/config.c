@@ -12,6 +12,7 @@ char *configPath = NULL;
 // helper vars
 int agenda_files_amount = -1;
 size_t todo_keywords_amount = -1;
+char *agend_files_path = NULL;
 // config options:
 // replace "_" with "-" for conf value. eg. cache_dir = cache-dir (in conf file)
 char **org_agenda_files = NULL;
@@ -125,7 +126,7 @@ void setConfigValue(char *optionString) {
     if (inputStrLen > optionLen + 1) { // cant be the option if its shorter
       // check if its the same
       if (0 == strncmp(options[i], optionString, optionLen)) {
-        printf("%s", optionString);
+        // printf("%s", optionString);
         optionIndex = i;
         break;
       }
@@ -253,6 +254,6 @@ void createConfig() {
 
     fopen(configPath, "w");
   } else {
-    printf("config exists: %s \n", configPath);
+    // printf("config exists: %s \n", configPath);
   }
 }
