@@ -214,6 +214,7 @@ int countNodes(char *input) {
   int isStatement = 2;
   int nextLen = 0;
   char *next = "";
+  int len = strlen(input);
 
   while (next != NULL) {
     setNext(input, &next, &pos, &isStatement, &nextLen);

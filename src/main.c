@@ -4,13 +4,10 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 struct fileMeta *files = NULL;
-char *searchString = NULL;
-int skipConfig = 0;
 
 void freeAllGlobals() {
   free(configPath);
@@ -99,126 +96,12 @@ void scanFiles() {
   }
 }
 
-void breakDueToMissingArg() {
-  printf("argument is missing\n");
-  exit(0);
-}
-
-void printHelp() {
-  char *help = "\
-commandline options:\n\
-note that they all override settings specified in the config file\n\
--q <query> syntax is detailed below\n\
--p <path to org file[s]>\n\
--a include \"hidden\" dirs (dir starting with a dot)\n\
-   has to be set before -p since it whould otherwise not have any effect\n\
--t set the todo keywords which should be recognized\n\
-   there must not be a space after or before the comma\"\n\
-   fe.: -t \"TODO,DONE,STRT\"\n\
--T set the amount of threads to use for parsing the org files\n\
-   set to 0 to use as many threads as there are files\n\
--R disables recursively adding org files to the list of files to be searched\n\
--I disables the usage of tag inheritance\n\
--s skip reading the config (mainly for testing)\n\
-\n\
-query syntax:\n\
-the query can consist of multiple conditions that should be met\n\
-\n\
-fields:\n\
-  TAG\n\
-  TODO\n\
-  NAME (the heading name)\n\
-  SCHED\n\
-  DEAD\n\
-  PROP\n\
-\n\
-match types:\n\
-  exact: ==\n\
-  contains: ~=\n\
-\n\
-logical operators:\n\
-  and &\n\
-  or |\n\
-  not !\n\
-  (brackets)\n\
-\n\
-examples:\n\
-TAG=='work' & (TODO=='TODO' | TAG=='important')\n\
-PROP==['key':'value']\n\
-\n\
-lists all headings that have a property with the value 'value2'\n\
-PROP~=['':'value2']\n\
-\n\
-lists all headings that have a property with the key 'key2'\n\
-PROP~=['key2':'']\n\
-\n\
-Further options are detailed in the example config\n\
-";
-  printf("%s", help);
-}
-
-void setArgumentOptions(int argc, char *argv[]) {
-  int setQuery = 0;
-  for (int i = 1; i < argc; i++) {
-    // printf("%s\n", argv[i]);
-    if (strncmp("-q", argv[i], 3) == 0) {
-      if (argv[i + 1] == NULL)
-        breakDueToMissingArg();
-      int len = strlen(argv[i + 1]);
-      searchString = calloc(len + 2, sizeof(char));
-      memcpy(searchString, argv[i + 1], len);
-      setQuery = 1;
-      i++;
-    } else if (strncmp("-p", argv[i], 3) == 0) {
-      if (argv[i + 1] == NULL)
-        breakDueToMissingArg();
-      int len = strlen(argv[i + 1]);
-      agenda_files_path = calloc(len + 2, sizeof(char));
-      memcpy(agenda_files_path, argv[i + 1], len);
-      agenda_files_path = fixPath(agenda_files_path);
-      addAgendaFiles(agenda_files_path);
-      i++;
-      isSetAgendaFilesPath = 1;
-    } else if (strncmp("-t", argv[i], 3) == 0) {
-      if (argv[i + 1] == NULL)
-        breakDueToMissingArg();
-      todo_keywordsCSV = argv[i + 1];
-      todo_keywords = split(todo_keywordsCSV, ",", &todo_keywords_amount);
-      i++;
-      isSetTodoKWDS = 1;
-    } else if (strncmp("-r", argv[i], 3) == 0) {
-      isSetRecAdding = 1;
-      recursive_adding = 1;
-    } else if (strncmp("-h", argv[i], 3) == 0) {
-      printHelp();
-    } else if (strncmp("-i", argv[i], 3) == 0) {
-      isSetInheritance = 1;
-      tag_inheritance = 0;
-    } else if (strncmp("-s", argv[i], 3) == 0) {
-      skipConfig = 1;
-    } else if (strncmp("-T", argv[i], 3) == 0) {
-      if (argv[i + 1] == NULL)
-        breakDueToMissingArg();
-      max_threads = atoi(argv[i + 1]);
-      isSetMaxThreads = 1;
-      if (max_threads < 0) {
-        printf("\n*********************************\n* ! INVALID max-threads "
-               "VALUE ! *\n*********************************\n");
-        exit(-1);
-      }
-    } else if (strncmp("-a", argv[i], 3) == 0) {
-      isSetHiddenDirInclusion = 1;
-      includeHiddenDirs = 1;
-    }
-  }
-}
-
 int main(int argc, char *argv[]) {
   atexit(freeAllGlobals);
 
   createConfig();
   setArgumentOptions(argc, argv);
-  if (!skipConfig)
+  if (skipConfig != 1)
     readConfig();
   else
     printf("skipping config\n");

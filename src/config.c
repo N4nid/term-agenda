@@ -1,4 +1,5 @@
 #include "util.c"
+#include "util.h"
 #include <dirent.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -16,14 +17,19 @@ int isSetTodoKWDS = 0;
 int isSetMaxThreads = 0;
 int isSetHiddenDirInclusion = 0;
 
+char *searchString = NULL;
+int skipConfig = 0;
+char *customSearch = NULL;
+int customSearchLen = 0;
+
 char *configPath = NULL;
 // helper vars
-int includeHiddenDirs = 0;
 int agenda_files_amount = 0;
 size_t todo_keywords_amount = 0;
 char *agenda_files_path = NULL;
 // config options:
 // replace "_" with "-" for conf value. eg. cache_dir = cache-dir (in conf file)
+int includeHiddenDirs = 0;
 char **org_agenda_files = NULL;
 int recursive_adding = 1; // TODO document default
 char *cache_dir = NULL;
@@ -123,7 +129,7 @@ void setConfigValue(char *optionString) {
   char *options[] = {
       "org-agenda-files:", "cache-dir:",       "max-threads:",
       "todo-keywords:",    "tag-inheritance:", "recursive-adding:",
-      "time-format:",      "include-hidden:"}; // ! has to end in :
+      "time-format:",      "include-hidden:",  "query:"}; // ! has to end in :
   int optionIndex = -1;
   int inputStrLen = strlen(optionString);
   int optionLen = -1;
@@ -153,13 +159,18 @@ void setConfigValue(char *optionString) {
   // strlcpy(optionValue, optionString + optionLen, delta);
 
   switch (optionIndex) {
-  case 0:                            // org_agenda_files
-    if (agenda_files_path != NULL) { // has already been set by cmd args
+  case 0: // org_agenda_files
+          // has already been set by cmd args
+    if (agenda_files_path != NULL || isSetAgendaFilesPath) {
+      free(optionValue);
+      optionValue = NULL;
       break;
+    }
+    if (customSearch != NULL) {
+      isSetAgendaFilesPath = 1;
     }
     optionValue = fixPath(optionValue);
     addAgendaFiles(optionValue);
-    // free(optionValue);
     optionValue = NULL;
     break;
   case 1: // cache_dir
@@ -167,7 +178,7 @@ void setConfigValue(char *optionString) {
 
     int len = strlen(optionValue) + 1;
     cache_dir = malloc(len * sizeof(char));
-    memcpy(cache_dir, optionValue, len * sizeof(char));
+    memcpy(cache_dir, optionValue, len);
 
     free(optionValue);
     optionValue = NULL;
@@ -176,6 +187,9 @@ void setConfigValue(char *optionString) {
     if (isSetMaxThreads == 0) {
       max_threads = atoi(optionValue);
     }
+    if (customSearch != NULL) {
+      isSetMaxThreads = 1;
+    }
     free(optionValue);
     optionValue = NULL;
     if (max_threads < 0) {
@@ -183,11 +197,13 @@ void setConfigValue(char *optionString) {
              "VALUE ! *\n*********************************\n");
       exit(-1);
     }
-
     break;
   case 3: // todo_keywords
     if (!isSetTodoKWDS) {
       todo_keywords = split(optionValue, ",", &todo_keywords_amount);
+    }
+    if (customSearch != NULL) {
+      isSetTodoKWDS = 1;
     }
     free(optionValue);
     optionValue = NULL;
@@ -196,6 +212,9 @@ void setConfigValue(char *optionString) {
     if (isSetInheritance == 0) {
       tag_inheritance = atoi(optionValue);
     }
+    if (customSearch != NULL) {
+      isSetInheritance = 1;
+    }
     free(optionValue);
     optionValue = NULL;
     break;
@@ -203,13 +222,16 @@ void setConfigValue(char *optionString) {
     if (isSetRecAdding == 0) { // has not been set by cmd args
       recursive_adding = atoi(optionValue);
     }
+    if (customSearch != NULL) {
+      isSetRecAdding = 1;
+    }
     free(optionValue);
     optionValue = NULL;
     break;
   case 6: // time_format
     len = strlen(optionValue) + 1;
     time_format = malloc(len * sizeof(char));
-    memcpy(time_format, optionValue, len * sizeof(char));
+    memcpy(time_format, optionValue, len);
 
     free(optionValue);
     optionValue = NULL;
@@ -218,6 +240,17 @@ void setConfigValue(char *optionString) {
     if (isSetHiddenDirInclusion == 0) { // has not been set by cmd args
       includeHiddenDirs = atoi(optionValue);
     }
+    if (customSearch != NULL) {
+      includeHiddenDirs = 1;
+    }
+    free(optionValue);
+    optionValue = NULL;
+    break;
+  case 8: // query
+    len = strlen(optionValue) + 1;
+    searchString = malloc(len * sizeof(char));
+    memcpy(searchString, optionValue, len);
+
     free(optionValue);
     optionValue = NULL;
     break;
@@ -225,31 +258,199 @@ void setConfigValue(char *optionString) {
 }
 
 void readConfig() {
+  if (configPath == NULL) {
+    printf("[!] error opening config file\n");
+    printf("[!] configPath is NULL");
+  }
   FILE *file = fopen(configPath, "r");
   char *line = NULL;
   size_t size = 0; // should automatically be resized by getline
-  int lineNum = 0;
+  int lineLen = 0;
+
+  int parsingTheRightOne = 0;
+  char customSearchDelim = '.';
+  fpos_t filePos;
+  int parsingCustomSearch = -1;
 
   if (file == NULL) {
-    printf("[!] error opening config file");
+    printf("[!] error opening config file\n");
     fclose(file);
   }
 
-  lineNum = getline(&line, &size, file);
-  while (lineNum >= 0) {
-    if (!(*line == '\n' || *line == ' ' || *line == '#')) {
-      // line is not ignoreable (a comment or empty)
+  lineLen = getline(&line, &size, file);
+  while (lineLen >= 0) {
+    // line is not ignoreable (a comment or empty)
+    if (!(*line == '\n' || *line == ' ' || *line == '#' ||
+          customSearch != NULL)) {
       setConfigValue(line);
     }
-    lineNum = getline(&line, &size, file);
+    if (customSearch != NULL && line[0] == customSearchDelim) {
+      // if (line[0] == customSearchDelim) {
+      if (parsingCustomSearch == 1) {
+        parsingCustomSearch = 0;
+        if (parsingTheRightOne == 1) {
+          parsingTheRightOne = 2;
+        }
+      } else {
+        parsingCustomSearch = 1;
+      }
+    }
+    if (parsingCustomSearch && customSearch != NULL) {
+      if (line[0] == '+' && !parsingTheRightOne) {
+        // - 2 to exclude the + and \n
+        if (strncmp(customSearch, line + 1, lineLen - 2) == 0 &&
+            lineLen - 2 == customSearchLen) {
+          parsingTheRightOne = 1;
+        }
+      } else if (parsingTheRightOne == 1) {
+        if (line[0] == '-' || line[0] == '#') { // is a setting
+          if (line[0] == '-') {
+            setConfigValue(line + 1);
+            // printf("l:%s", line + 1);
+          }
+        } else {
+          parsingTheRightOne = 2;
+        }
+      }
+    }
+    lineLen = getline(&line, &size, file);
   }
 
   fclose(file);
   free(line);
   line = NULL;
 
-  free(configPath);
-  configPath = NULL;
+  if (customSearch != NULL &&
+      (parsingCustomSearch == -1 || parsingTheRightOne != 2)) {
+    printf("this custom query is not defined\n");
+  }
+}
+
+void breakDueToMissingArg() {
+  printf("argument is missing\n");
+  exit(0);
+}
+
+void printHelp() {
+  char *help = "\
+commandline options:\n\
+note that they all override settings specified in the config file\n\
+-q <query> syntax is detailed below\n\
+-Q <custom query> use a query defined in the config\n\
+-p <path to org file[s]>\n\
+-a include \"hidden\" dirs (dir starting with a dot)\n\
+   has to be set before -p since it whould otherwise not have any effect\n\
+-t set the todo keywords which should be recognized\n\
+   there must not be a space after or before the comma\"\n\
+   fe.: -t \"TODO,DONE,STRT\"\n\
+-T set the amount of threads to use for parsing the org files\n\
+   set to 0 to use as many threads as there are files\n\
+-R disables recursively adding org files to the list of files to be searched\n\
+-I disables the usage of tag inheritance\n\
+-s skip reading the config (mainly for testing)\n\
+\n\
+query syntax:\n\
+the query can consist of multiple conditions that should be met\n\
+\n\
+fields:\n\
+  TAG\n\
+  TODO\n\
+  NAME (the heading name)\n\
+  SCHED\n\
+  DEAD\n\
+  PROP\n\
+\n\
+match types:\n\
+  exact: ==\n\
+  contains: ~=\n\
+\n\
+logical operators:\n\
+  and &\n\
+  or |\n\
+  not !\n\
+  (brackets)\n\
+\n\
+examples:\n\
+TAG=='work' & (TODO=='TODO' | TAG=='important')\n\
+PROP==['key':'value']\n\
+\n\
+lists all headings that have a property with the value 'value2'\n\
+PROP~=['':'value2']\n\
+\n\
+lists all headings that have a property with the key 'key2'\n\
+PROP~=['key2':'']\n\
+\n\
+Further options are detailed in the example config\n\
+";
+  printf("%s", help);
+}
+
+void setArgumentOptions(int argc, char *argv[]) {
+  int setQuery = 0;
+  for (int i = 1; i < argc; i++) {
+    // printf("%s\n", argv[i]);
+    if (strncmp("-q", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+      int len = strlen(argv[i + 1]);
+      searchString = calloc(len + 2, sizeof(char));
+      memcpy(searchString, argv[i + 1], len);
+      setQuery = 1;
+      i++;
+    } else if (strncmp("-Q", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+      int len = strlen(argv[i + 1]);
+      customSearchLen = len;
+      customSearch = calloc(len + 2, sizeof(char));
+      memcpy(customSearch, argv[i + 1], len);
+      skipConfig = 0;
+      readConfig();
+      free(customSearch);
+      customSearch = NULL;
+      break;
+    } else if (strncmp("-p", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+      int len = strlen(argv[i + 1]);
+      agenda_files_path = calloc(len + 2, sizeof(char));
+      memcpy(agenda_files_path, argv[i + 1], len);
+      agenda_files_path = fixPath(agenda_files_path);
+      addAgendaFiles(agenda_files_path);
+      i++;
+      isSetAgendaFilesPath = 1;
+    } else if (strncmp("-t", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+      todo_keywordsCSV = argv[i + 1];
+      todo_keywords = split(todo_keywordsCSV, ",", &todo_keywords_amount);
+      i++;
+      isSetTodoKWDS = 1;
+    } else if (strncmp("-r", argv[i], 3) == 0) {
+      isSetRecAdding = 1;
+      recursive_adding = 1;
+    } else if (strncmp("-h", argv[i], 3) == 0) {
+      printHelp();
+    } else if (strncmp("-i", argv[i], 3) == 0) {
+      isSetInheritance = 1;
+      tag_inheritance = 0;
+    } else if (strncmp("-s", argv[i], 3) == 0) {
+      skipConfig = 1;
+    } else if (strncmp("-T", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+      max_threads = atoi(argv[i + 1]);
+      isSetMaxThreads = 1;
+      if (max_threads < 0) {
+        printf("\n*********************************\n* ! INVALID max-threads "
+               "VALUE ! *\n*********************************\n");
+        exit(-1);
+      }
+    } else if (strncmp("-a", argv[i], 3) == 0) {
+      isSetHiddenDirInclusion = 1;
+      includeHiddenDirs = 1;
+    }
+  }
 }
 
 void createConfig() {
