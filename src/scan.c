@@ -367,11 +367,11 @@ void *scanFile(void *threadWrapperStruct) {
       thisFile.headings[headingCount].lineNum = lineNum;
 
       // set thisFile.headings[i].name to line without the *
-      size_t newsize = linesize - (lvl + 1);
+      size_t newsize = lineLen - (lvl + 1);
       char *lineWithoutAsterisk = line + lvl + 1;
-      thisFile.headings[headingCount].name = malloc(newsize);
+      thisFile.headings[headingCount].name = calloc(newsize, sizeof(char));
       memcpy(thisFile.headings[headingCount].name, lineWithoutAsterisk,
-             newsize);
+             newsize - 1); // -1 to exclude newline
 
       // handle todokwd
       size_t todoKwdSize;

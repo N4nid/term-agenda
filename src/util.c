@@ -29,15 +29,17 @@ char *fixPath(char *path) {
   }
 
   if (newSize != -1) {
-    char *tmp = calloc(newSize, sizeof(char));
+    char *tmp = calloc(newSize + 1, sizeof(char));
     if (tmp) {
       // save path in tmp2
       char *tmp2 = calloc(pathLen + addLeadingSlash, sizeof(char));
       // expandTilde acts as the offset
       memcpy(tmp2, path + expandTilde, pathLen - expandTilde);
 
-      // path to homepath
-      memcpy(tmp, getenv("HOME"), homePathSize);
+      if (expandTilde) {
+        // path to homepath
+        memcpy(tmp, getenv("HOME"), homePathSize);
+      }
       strncat(tmp, tmp2, pathLen); // append original path
 
       struct stat sfileInfo;

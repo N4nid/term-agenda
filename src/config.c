@@ -8,21 +8,30 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+// cmdline options
+int isSetRecAdding = 0;
+int isSetAgendaFilesPath = 0;
+int isSetInheritance = 0;
+int isSetTodoKWDS = 0;
+int isSetMaxThreads = 0;
+int isSetHiddenDirInclusion = 0;
+
 char *configPath = NULL;
 // helper vars
-int agenda_files_amount = -1;
-size_t todo_keywords_amount = -1;
-char *agend_files_path = NULL;
+int includeHiddenDirs = 0;
+int agenda_files_amount = 0;
+size_t todo_keywords_amount = 0;
+char *agenda_files_path = NULL;
 // config options:
 // replace "_" with "-" for conf value. eg. cache_dir = cache-dir (in conf file)
 char **org_agenda_files = NULL;
-int recursive_adding = 10; // TODO document default
+int recursive_adding = 1; // TODO document default
 char *cache_dir = NULL;
-int max_threads = 10;                 // TODO document default
+int max_threads = 0;                  // TODO document default
 int tag_inheritance = 1;              // 1 true, 0 false
 char *todo_keywordsCSV = "TODO,DONE"; // comma seperated list of todo-keywords
 char **todo_keywords = NULL;
-char *time_format = "%Y-%m-%d";
+char *time_format = NULL; // fe. %Y-%m-%d
 
 void addAgendaFiles(char *path) {
   int pathLen = strlen(path);
@@ -43,10 +52,6 @@ void addAgendaFiles(char *path) {
         org_agenda_files = malloc(sizeof(char *));
       }
       size_t size;
-
-      if (agenda_files_amount == -1) { // could already be set due to recursion
-        agenda_files_amount = 0;
-      }
 
       char *newPath;
       int len = 0;
@@ -76,6 +81,10 @@ void addAgendaFiles(char *path) {
         } // is a dir (exclude "." and "..")
         else if (ent->d_type == DT_DIR && strncmp(ent->d_name, "..", 3) != 0 &&
                  strncmp(ent->d_name, ".", 2) != 0 && recursive_adding == 1) {
+
+          if ('.' == ent->d_name[0] && includeHiddenDirs == 0) {
+            continue;
+          }
 
           len = pathLen + filenameLen + 2;
           newPath = calloc(len, sizeof(char));
@@ -114,7 +123,7 @@ void setConfigValue(char *optionString) {
   char *options[] = {
       "org-agenda-files:", "cache-dir:",       "max-threads:",
       "todo-keywords:",    "tag-inheritance:", "recursive-adding:",
-      "time-format:"}; // ! has to end in :
+      "time-format:",      "include-hidden:"}; // ! has to end in :
   int optionIndex = -1;
   int inputStrLen = strlen(optionString);
   int optionLen = -1;
@@ -144,7 +153,10 @@ void setConfigValue(char *optionString) {
   // strlcpy(optionValue, optionString + optionLen, delta);
 
   switch (optionIndex) {
-  case 0: // org_agenda_files
+  case 0:                            // org_agenda_files
+    if (agenda_files_path != NULL) { // has already been set by cmd args
+      break;
+    }
     optionValue = fixPath(optionValue);
     addAgendaFiles(optionValue);
     // free(optionValue);
@@ -161,7 +173,9 @@ void setConfigValue(char *optionString) {
     optionValue = NULL;
     break;
   case 2: // max_threads
-    max_threads = atoi(optionValue);
+    if (isSetMaxThreads == 0) {
+      max_threads = atoi(optionValue);
+    }
     free(optionValue);
     optionValue = NULL;
     if (max_threads < 0) {
@@ -172,28 +186,38 @@ void setConfigValue(char *optionString) {
 
     break;
   case 3: // todo_keywords
-    todo_keywords = split(optionValue, ",", &todo_keywords_amount);
-    //    for (int i = 0; i < todo_keywords_amount; i++) {
-    //      printf("%s\n", todo_keywords[i]);
-    //    }
+    if (!isSetTodoKWDS) {
+      todo_keywords = split(optionValue, ",", &todo_keywords_amount);
+    }
     free(optionValue);
     optionValue = NULL;
     break;
   case 4: // tag_inheritance
-    tag_inheritance = atoi(optionValue);
+    if (isSetInheritance == 0) {
+      tag_inheritance = atoi(optionValue);
+    }
     free(optionValue);
     optionValue = NULL;
     break;
-  case 5: // recursive_adding
-    recursive_adding = atoi(optionValue);
+  case 5:                      // recursive_adding
+    if (isSetRecAdding == 0) { // has not been set by cmd args
+      recursive_adding = atoi(optionValue);
+    }
     free(optionValue);
     optionValue = NULL;
     break;
-  case 6: // recursive_adding
+  case 6: // time_format
     len = strlen(optionValue) + 1;
     time_format = malloc(len * sizeof(char));
     memcpy(time_format, optionValue, len * sizeof(char));
 
+    free(optionValue);
+    optionValue = NULL;
+    break;
+  case 7:                               // include-hidden
+    if (isSetHiddenDirInclusion == 0) { // has not been set by cmd args
+      includeHiddenDirs = atoi(optionValue);
+    }
     free(optionValue);
     optionValue = NULL;
     break;

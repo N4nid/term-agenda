@@ -39,7 +39,8 @@ void printResult(int *result, int len) {
   for (int i = 0; i < len; i++) {
     if (result[i] == 1) {
       // printf("%s", headings[i].name);
-      printf("%d %s", headings[i].lineNum, headings[i].name);
+      printf("%d %s -> %s\n", headings[i].lineNum, headings[i].name,
+             headings[i].path);
     }
   }
   printf("\n");
@@ -564,10 +565,11 @@ void toFlatArray(struct fileMeta *files) {
 }
 
 void search(char *search, struct fileMeta *files) {
-  struct node *searchTree = calloc(1, sizeof(struct node));
   if (search == NULL) {
+    // printf("no search specified\nsee -h for help regarding the usage\n");
     return;
   }
+  struct node *searchTree = calloc(1, sizeof(struct node));
   nodeAmount = countNodes(search);
   // printf("NODES AMOUNT:%d\n\n", nodeAmount);
 
@@ -582,7 +584,7 @@ void search(char *search, struct fileMeta *files) {
   int *results = calloc(len, sizeof(int));
   computeResult(searchTree->left, results, len);
 
-  printf("search: %s\n", search);
+  printf("search: %s in %d files\n", search, agenda_files_amount);
   printResult(results, len);
 
   free(results);

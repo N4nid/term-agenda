@@ -5,4 +5,4 @@
 gcc -static -g -o term-agenda ../src/main.c
 
 # also run the programm
-./term-agenda
+./term-agenda "${@}"
