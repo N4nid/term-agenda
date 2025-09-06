@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "config.c"
 #include "util.h"
 #include <ctype.h>
@@ -9,6 +10,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
+int dateLen = -1;
 
 int getHeadingLvl(char *headline) {
   // returns the amount of "*" in front of a heading
@@ -232,10 +235,30 @@ void setInheritedTags(int currentIndex, struct fileMeta file, int lvl) {
   }
 }
 
-// does not work if deadline and schedule are in the same line
-// well it misses one of them
+void setDateLen() {
+  if (time_format == NULL) {
+    return;
+  }
+  time_t now;
+  struct tm *timeinfo;
+  char buffer[80];
+
+  time(&now);
+  timeinfo = localtime(&now);
+
+  strftime(buffer, sizeof(buffer), time_format, timeinfo);
+  dateLen = strlen(buffer);
+  // printf("%s\n", buffer);
+  // printf("%d\n", dateLen);
+}
+
 // kwd would be SCHEDULED: or DEADLINE:
-char *getScheduledDate(char *line, char *kwd, size_t *dateSize) {
+char *getScheduledDate(char *line, char *kwd, size_t *dateSize,
+                       size_t *dateAsInt) {
+  if (dateLen == -1) {
+    setDateLen();
+  }
+
   char *position = NULL;
   position = strstr(line, kwd);
   if (position == NULL) {
@@ -265,11 +288,23 @@ char *getScheduledDate(char *line, char *kwd, size_t *dateSize) {
     return NULL;
   }
 
-  *dateSize = index + 1;
-  char *dateStr = calloc(index + 1, sizeof(char));
+  *dateSize = index;
+  if (*dateSize > dateLen) {
+    // printf("cant parse date time format ");
+    *dateSize = dateLen;
+  }
+  char *dateStr = calloc(*dateSize + 1, sizeof(char));
 
-  strncat(dateStr, position + 1, index - 1);
+  memcpy(dateStr, position + 1, *dateSize);
   // printf(" .........|%s|\n", dateStr);
+
+  struct tm parsed_time = {0};
+  strptime(dateStr, time_format, &parsed_time);
+  char buffer[14];
+  strftime(buffer, sizeof(buffer), "%Y%m%d%H%M", &parsed_time);
+  *dateAsInt = atol(buffer);
+  // printf("%s - %ld\n", buffer, *dateAsInt);
+
   return dateStr;
 }
 
@@ -325,6 +360,12 @@ void *scanFile(void *threadWrapperStruct) {
   // struct fileMeta thisFile;
   if (path == NULL) {
     thisFile.isInitialized = 0;
+    return NULL;
+  }
+  if (time_format == NULL) {
+    thisFile.isInitialized = 0;
+    printf("no time format specified\nplease specify the time format used in "
+           "the org files in the config\n");
     return NULL;
   }
 
@@ -410,6 +451,8 @@ void *scanFile(void *threadWrapperStruct) {
       thisFile.headings[headingCount].scheduled = NULL;
       thisFile.headings[headingCount].propertiesAmount = 0;
       thisFile.headings[headingCount].properties = NULL;
+      thisFile.headings[headingCount].deadlineNum = 0;
+      thisFile.headings[headingCount].scheduledNum = 0;
 
     } else {
 
@@ -485,15 +528,19 @@ void *scanFile(void *threadWrapperStruct) {
       if (lineLen >= 25 && parsingProperties == 0 && headingCount >= 0) {
         size_t dateSize;
         char *dateSched = NULL;
+        size_t schedNum = 0;
         char *dateDead = NULL;
-        dateSched = getScheduledDate(line, "SCHEDULED:", &dateSize);
-        dateDead = getScheduledDate(line, "SCHEDULED:", &dateSize);
+        size_t deadNum = 0;
+
+        dateSched = getScheduledDate(line, "SCHEDULED:", &dateSize, &schedNum);
+        dateDead = getScheduledDate(line, "SCHEDULED:", &dateSize, &deadNum);
         if (dateSched != NULL) {
           thisFile.headings[headingCount].scheduled =
               calloc(dateSize, sizeof(char));
           memcpy(thisFile.headings[headingCount].scheduled, dateSched,
                  dateSize - 1);
 
+          thisFile.headings[headingCount].scheduledNum = schedNum;
           // printf("scheduled: %s\n",
           // thisFile.headings[headingCount].scheduled);
           free(dateSched);
@@ -505,6 +552,7 @@ void *scanFile(void *threadWrapperStruct) {
           memcpy(thisFile.headings[headingCount].deadline, dateDead,
                  dateSize - 1);
 
+          thisFile.headings[headingCount].deadlineNum = deadNum;
           // printf("deadline: %s\n", thisFile.headings[headingCount].deadline);
           free(dateDead);
           dateDead = NULL;

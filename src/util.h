@@ -9,7 +9,9 @@ struct headingMeta {
   size_t tagsAmount;
   char *todokwd; // fe. TODO, DONE
   char *scheduled;
+  size_t scheduledNum;
   char *deadline;
+  size_t deadlineNum;
   char ***properties;
   size_t propertiesAmount;
 

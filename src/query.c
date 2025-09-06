@@ -28,6 +28,8 @@ const int name = 6;
 // matchTypes constants
 const int exact = 1;    // ==
 const int contains = 2; // ~=
+const int greater = 3;  // >=
+const int lesser = 4;   // <=
 
 int nodeAmount = 0;
 struct node *nodes;

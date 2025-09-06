@@ -280,7 +280,7 @@ void readConfig() {
   lineLen = getline(&line, &size, file);
   while (lineLen >= 0) {
     // line is not ignoreable (a comment or empty)
-    if (!(*line == '\n' || *line == ' ' || *line == '#' ||
+    if (!(*line == '\n' || *line == ' ' || *line == '\0' || *line == '#' ||
           customSearch != NULL)) {
       setConfigValue(line);
     }
@@ -477,7 +477,9 @@ void createConfig() {
     printf("[i] config file doesnt exist -> creating it\n");
     printf("[i] configPath: %s \n", configPath);
 
-    fopen(configPath, "w");
+    FILE *file = fopen(configPath, "w");
+    free(file);
+    file = NULL;
   } else {
     // printf("config exists: %s \n", configPath);
   }
