@@ -26,10 +26,10 @@ const int deadline = 4;
 const int property = 5;
 const int name = 6;
 // matchTypes constants
-const int exact = 1;    // ==
-const int contains = 2; // ~=
-const int greater = 3;  // >=
-const int lesser = 4;   // <=
+const int exact = 1;       // ==
+const int contains = 2;    // ~=
+const int greaterOrEq = 3; // >=
+const int lesserOrEq = 4;  // <=
 
 int nodeAmount = 0;
 struct node *nodes;
@@ -56,10 +56,10 @@ void recPrintTree(struct node *node, int isLeft, int depth) {
   if (isLeft)
     side = 'l';
   if (node->type == statement) {
-    // printf("%d|%c -YOO: %d %s\n", depth, side, node->type, node->value);
+    printf("%d|%c -YOO: %d %s\n", depth, side, node->type, node->value);
     //  free(node->value);
   } else {
-    // printf("%d|%c -YOO: %d \n", depth, side, node->type);
+    printf("%d|%c -YOO: %d \n", depth, side, node->type);
   }
 
   depth++;
@@ -178,7 +178,7 @@ int setStatmentNode(char *input, int inputLen, struct node *node) {
   // find match type
   int index = lens[field - 1];
   char current = input[index];
-  while (current != '=' && current != '~') {
+  while (current != '=' && current != '~' && current != '<' && current != '>') {
     // printf(" curr; %c\n", current);
     index++;
     current = input[index];
@@ -187,8 +187,12 @@ int setStatmentNode(char *input, int inputLen, struct node *node) {
   }
   if (current == '~')
     node->matchType = contains;
-  else
+  else if (current == '=')
     node->matchType = exact;
+  else if (current == '<')
+    node->matchType = lesserOrEq;
+  else if (current == '>')
+    node->matchType = greaterOrEq;
 
   index += 2;
   current = input[index];
@@ -445,8 +449,20 @@ char *getSimpleField(int field, struct headingMeta *heading) {
   return NULL;
 }
 
-int match(char *this, char *should, int matchType) {
+int matchNum(long this, long should, int matchType) {
+  if (matchType == greaterOrEq) {
+    if (this >= should) {
+      return 1;
+    }
+  } else if (matchType == lesserOrEq) {
+    if (this <= should) {
+      return 1;
+    }
+  }
+  return 0;
+}
 
+int matchString(char *this, char *should, int matchType) {
   if (matchType == exact) {
     if (strcmp(this, should) == 0) {
       return 1;
@@ -481,13 +497,37 @@ void check(int *result, int field, char *value, int matchType) {
       char *headingVal = getSimpleField(field, &headings[i]);
       if (headingVal == NULL)
         continue;
-      result[i] = match(headingVal, val, matchType);
+      if (matchType == exact || matchType == contains) {
+        result[i] = matchString(headingVal, val, matchType);
+        // printf("|%s| = |%s|\n", headingVal, val);
+      } else if (field == scheduled || field == deadline) {
+        long headingNumVal = 0;
+        long valNum = -1;
+        if (field == scheduled)
+          headingNumVal = headings[i].scheduledNum;
+        else
+          headingNumVal = headings[i].deadlineNum;
+        // printf("|%s| = |%s|\n", headingVal, val);
+
+        // convert given date into num
+        struct tm parsed_time = {0};
+        strptime(val, time_format, &parsed_time);
+        char buffer[internalTmFLen];
+        strftime(buffer, sizeof(buffer), internalTimeFormat, &parsed_time);
+        valNum = atol(buffer);
+        // printf("|%ld| = |%ld|\n", headingNumVal, valNum);
+        // printf("------\n");
+
+        result[i] = matchNum(headingNumVal, valNum, matchType);
+      } else { // can only match other fields with exact or conatins
+        result[i] = 0;
+      }
 
     } else {
       // check tags
       if (field == tag) {
         for (int j = 0; j < headings[i].tagsAmount; j++) {
-          if (match(headings[i].tags[j], val, matchType)) {
+          if (matchString(headings[i].tags[j], val, matchType)) {
             result[i] = 1;
             break;
           }
@@ -495,14 +535,13 @@ void check(int *result, int field, char *value, int matchType) {
         // check properties
       } else {
         for (int j = 0; j < headings[i].propertiesAmount; j++) {
-          // printf("| has FIELD: %s should: %s\n",
-          // headings[i].properties[j][0],propField);
-          // printf("| has VAL: %s should: %s\n",
-          // headings[i].properties[j][1],propVal);
+          int hasVal = 0;
+          int hasField = 0;
 
-          int hasField =
-              match(headings[i].properties[j][0], propField, matchType);
-          int hasVal = match(headings[i].properties[j][1], propVal, matchType);
+          hasField =
+              matchString(headings[i].properties[j][0], propField, matchType);
+          hasVal =
+              matchString(headings[i].properties[j][1], propVal, matchType);
 
           if (hasField && hasVal) {
             result[i] = 1;

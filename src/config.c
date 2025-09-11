@@ -16,6 +16,7 @@ int isSetInheritance = 0;
 int isSetTodoKWDS = 0;
 int isSetMaxThreads = 0;
 int isSetHiddenDirInclusion = 0;
+int isSetTimeFormat = 0;
 
 char *searchString = NULL;
 int skipConfig = 0;
@@ -229,10 +230,11 @@ void setConfigValue(char *optionString) {
     optionValue = NULL;
     break;
   case 6: // time_format
-    len = strlen(optionValue) + 1;
-    time_format = malloc(len * sizeof(char));
-    memcpy(time_format, optionValue, len);
-
+    if (isSetTimeFormat == 0) {
+      len = strlen(optionValue) + 1;
+      time_format = malloc(len * sizeof(char));
+      memcpy(time_format, optionValue, len);
+    }
     free(optionValue);
     optionValue = NULL;
     break;
@@ -340,6 +342,7 @@ note that they all override settings specified in the config file\n\
 -p <path to org file[s]>\n\
 -a include \"hidden\" dirs (dir starting with a dot)\n\
    has to be set before -p since it whould otherwise not have any effect\n\
+-f format to use when parsing dates\n\
 -t set the todo keywords which should be recognized\n\
    there must not be a space after or before the comma\"\n\
    fe.: -t \"TODO,DONE,STRT\"\n\
@@ -356,7 +359,7 @@ fields:\n\
   TAG\n\
   TODO\n\
   NAME (the heading name)\n\
-  SCHED\n\
+  SCHED (provide date in the same format as specified in the config option)\n\
   DEAD\n\
   PROP\n\
 \n\
@@ -426,6 +429,14 @@ void setArgumentOptions(int argc, char *argv[]) {
       todo_keywords = split(todo_keywordsCSV, ",", &todo_keywords_amount);
       i++;
       isSetTodoKWDS = 1;
+    } else if (strncmp("-f", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+      int len = strlen(argv[i + 1]);
+      time_format = calloc(len + 2, sizeof(char));
+      memcpy(time_format, argv[i + 1], len);
+      isSetTimeFormat = 1;
+      i++;
     } else if (strncmp("-r", argv[i], 3) == 0) {
       isSetRecAdding = 1;
       recursive_adding = 1;

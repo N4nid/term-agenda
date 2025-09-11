@@ -12,6 +12,8 @@
 #include <unistd.h>
 
 int dateLen = -1;
+char *internalTimeFormat = "%Y%m%d%H%M";
+int internalTmFLen = 14;
 
 int getHeadingLvl(char *headline) {
   // returns the amount of "*" in front of a heading
@@ -247,7 +249,7 @@ void setDateLen() {
   timeinfo = localtime(&now);
 
   strftime(buffer, sizeof(buffer), time_format, timeinfo);
-  dateLen = strlen(buffer);
+  dateLen = strlen(buffer) + 1;
   // printf("%s\n", buffer);
   // printf("%d\n", dateLen);
 }
@@ -300,8 +302,8 @@ char *getScheduledDate(char *line, char *kwd, size_t *dateSize,
 
   struct tm parsed_time = {0};
   strptime(dateStr, time_format, &parsed_time);
-  char buffer[14];
-  strftime(buffer, sizeof(buffer), "%Y%m%d%H%M", &parsed_time);
+  char buffer[internalTmFLen];
+  strftime(buffer, sizeof(buffer), internalTimeFormat, &parsed_time);
   *dateAsInt = atol(buffer);
   // printf("%s - %ld\n", buffer, *dateAsInt);
 
