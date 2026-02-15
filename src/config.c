@@ -23,6 +23,7 @@ char **searchString = NULL;
 int skipConfig = 0;
 char *customSearch = NULL;
 int customSearchLen = 0;
+struct searchOption *searchOptions = NULL;
 
 char *configPath = NULL;
 // helper vars
@@ -127,28 +128,36 @@ void addAgendaFiles(char *path) {
   path = NULL;
 }
 
-void setConfigValue(char *optionString) {
+int getOptionType(char *optionString, int *optionLen) {
   char *options[] = {
       "org-agenda-files:", "cache-dir:",       "max-threads:",
       "todo-keywords:",    "tag-inheritance:", "recursive-adding:",
-      "time-format:",      "include-hidden:",  "query:"}; // ! has to end in :
+      "time-format:",      "include-hidden:",  "uery:"}; // ! has to end in :
   int optionIndex = -1;
   int inputStrLen = strlen(optionString);
-  int optionLen = -1;
+  *optionLen = -1;
   char *optionValue = NULL;
 
   // find out which option it is
   for (int i = 0; i < ARRAY_SIZE(options); i++) {
-    optionLen = strlen(options[i]);
-    if (inputStrLen > optionLen + 1) { // cant be the option if its shorter
+    *optionLen = strlen(options[i]);
+    if (inputStrLen > *optionLen + 1) { // cant be the option if its shorter
       // check if its the same
-      if (0 == strncmp(options[i], optionString, optionLen)) {
+      if (0 == strncmp(options[i], optionString, *optionLen)) {
         // printf("%s", optionString);
         optionIndex = i;
         break;
       }
     }
   }
+  return optionIndex;
+}
+
+void setConfigValue(char *optionString) {
+  int optionLen = -1;
+  int inputStrLen = strlen(optionString);
+  char *optionValue = NULL;
+  int optionIndex = getOptionType(optionString, &optionLen);
 
   if (optionIndex == -1) { // no option found
     return;
@@ -168,9 +177,6 @@ void setConfigValue(char *optionString) {
       optionValue = NULL;
       break;
     }
-    if (customSearch != NULL) {
-      isSetAgendaFilesPath = 1;
-    }
     optionValue = fixPath(optionValue);
     addAgendaFiles(optionValue);
     optionValue = NULL;
@@ -189,9 +195,6 @@ void setConfigValue(char *optionString) {
     if (isSetMaxThreads == 0) {
       max_threads = atoi(optionValue);
     }
-    if (customSearch != NULL) {
-      isSetMaxThreads = 1;
-    }
     free(optionValue);
     optionValue = NULL;
     if (max_threads < 0) {
@@ -204,9 +207,6 @@ void setConfigValue(char *optionString) {
     if (!isSetTodoKWDS) {
       todo_keywords = split(optionValue, ",", &todo_keywords_amount);
     }
-    if (customSearch != NULL) {
-      isSetTodoKWDS = 1;
-    }
     free(optionValue);
     optionValue = NULL;
     break;
@@ -214,18 +214,12 @@ void setConfigValue(char *optionString) {
     if (isSetInheritance == 0) {
       tag_inheritance = atoi(optionValue);
     }
-    if (customSearch != NULL) {
-      isSetInheritance = 1;
-    }
     free(optionValue);
     optionValue = NULL;
     break;
   case 5:                      // recursive_adding
     if (isSetRecAdding == 0) { // has not been set by cmd args
       recursive_adding = atoi(optionValue);
-    }
-    if (customSearch != NULL) {
-      isSetRecAdding = 1;
     }
     free(optionValue);
     optionValue = NULL;
@@ -243,21 +237,75 @@ void setConfigValue(char *optionString) {
     if (isSetHiddenDirInclusion == 0) { // has not been set by cmd args
       includeHiddenDirs = atoi(optionValue);
     }
-    if (customSearch != NULL) {
-      includeHiddenDirs = 1;
-    }
-    free(optionValue);
-    optionValue = NULL;
-    break;
-  case 8: // query
-    len = strlen(optionValue) + 1;
-    searchString = malloc(len * sizeof(char));
-    memcpy(searchString, optionValue, len);
-
     free(optionValue);
     optionValue = NULL;
     break;
   }
+}
+
+void initializeSearchOptions(int amount) {
+  for (int i = 0; i < amount; i++) {
+    searchOptions[i].searchString = NULL;
+    searchOptions[i].agenda_files_path = NULL;
+    searchOptions[i].includeHiddenDirs = -1;
+    searchOptions[i].max_threads = -1;
+    searchOptions[i].recursive_adding = -1;
+    searchOptions[i].tag_inheritance = -1;
+    searchOptions[i].time_format = NULL;
+    searchOptions[i].todo_keywordsCSV = NULL;
+  }
+}
+
+// assumes that searchOptions is allocated correctly
+void setCustomSearchOption(char *line, int index) {
+  int optionLen = -1;
+  int optionType = getOptionType(line, &optionLen);
+  if (optionType == -1) {
+    printf("This is not an valid option:\n %s", line);
+    return;
+  }
+
+  int inputStrLen = strlen(line);
+  int len = inputStrLen - optionLen; // the amount of chars after :
+  char *optionValue = calloc(len + 1, sizeof(char));
+  strncpy(optionValue, line + optionLen, len - 1);
+  strncat(optionValue, "\0", 1);
+
+  switch (optionType) {
+  case 0: // org_agenda_files (filepath)
+    optionValue = fixPath(optionValue);
+    searchOptions[index].agenda_files_path = malloc(len * sizeof(char));
+    memcpy(searchOptions[index].agenda_files_path, optionValue, len);
+    break;
+  case 2: // max_threads
+    searchOptions[index].max_threads = atoi(optionValue);
+    break;
+  case 3: // todo_keyword
+    searchOptions[index].todo_keywordsCSV = malloc(len * sizeof(char));
+    memcpy(searchOptions[index].todo_keywordsCSV, optionValue, len);
+    break;
+  case 4: // tag_inheritance
+    searchOptions[index].tag_inheritance = atoi(optionValue);
+    break;
+  case 5: // recursive_adding
+    searchOptions[index].recursive_adding = atoi(optionValue);
+    break;
+  case 6: // time_format
+    searchOptions[index].time_format = malloc(len * sizeof(char));
+    memcpy(searchOptions[index].time_format, optionValue, len);
+    break;
+  case 7: // include-hidden
+    searchOptions[index].recursive_adding = atoi(optionValue);
+    break;
+  case 8: // query
+    searchOptions[index].searchString = malloc(len * sizeof(char));
+    memcpy(searchOptions[index].searchString, optionValue, len);
+    break;
+  }
+
+  free(optionValue);
+  optionValue = NULL;
+  // printf("optionType: %d\n", optionType);
 }
 
 void readConfig() {
@@ -270,10 +318,12 @@ void readConfig() {
   size_t size = 0; // should automatically be resized by getline
   int lineLen = 0;
 
+  int parsingCustomSearch = -1;
   int parsingTheRightOne = 0;
+  int hasCountedQueries = 0;
+  int searchIndex = -1;
   char customSearchDelim = '.';
   fpos_t filePos;
-  int parsingCustomSearch = -1;
 
   if (file == NULL) {
     printf("[!] error opening config file\n");
@@ -291,28 +341,48 @@ void readConfig() {
       // if (line[0] == customSearchDelim) {
       if (parsingCustomSearch == 1) {
         parsingCustomSearch = 0;
-        if (parsingTheRightOne == 1) {
-          parsingTheRightOne = 2;
+        if (parsingTheRightOne == 1) { // is parsing the options
+          parsingTheRightOne = 2;      // end parsing the search options
         }
       } else {
         parsingCustomSearch = 1;
       }
     }
+
     if (parsingCustomSearch && customSearch != NULL) {
+      // check if its the right search
       if (line[0] == '+' && !parsingTheRightOne) {
         // - 2 to exclude the + and \n
         if (strncmp(customSearch, line + 1, lineLen - 2) == 0 &&
             lineLen - 2 == customSearchLen) {
           parsingTheRightOne = 1;
+
+          // mark postion to later jump back and do the actual parsing
+          fgetpos(file, &filePos);
         }
-      } else if (parsingTheRightOne == 1) {
-        if (line[0] == '-' || line[0] == '#') { // is a setting
-          if (line[0] == '-') {
-            setConfigValue(line + 1);
-            // printf("l:%s", line + 1);
+      } else if (parsingTheRightOne == 1 && hasCountedQueries != 1) {
+
+        if (line[0] == 'q') { // is a query
+          printf("-q:%s", line);
+          searchAmount++;
+        } else if (line[0] != '-' && line[0] != '#') { // no more queries
+          hasCountedQueries = 1;
+          fsetpos(file, &filePos);
+          searchOptions = calloc(searchAmount, sizeof(struct searchOption));
+          initializeSearchOptions(searchAmount);
+        }
+
+      } else if (parsingTheRightOne == 1 && hasCountedQueries == 1) {
+        // do the actual search option setting
+        if (line[0] == '-' || line[0] == 'q') { // is a setting
+          if (line[0] == 'q') {
+            searchIndex++;
           }
-        } else {
+          setCustomSearchOption(line + 1, searchIndex);
+          printf("  l:%s", line + 1);
+        } else if (line[0] != '#') { // no more options
           parsingTheRightOne = 2;
+          parsingCustomSearch = 0;
         }
       }
     }
@@ -432,9 +502,7 @@ void setArgumentOptions(int argc, char *argv[]) {
       customSearch = calloc(len + 2, sizeof(char));
       memcpy(customSearch, argv[i + 1], len);
       skipConfig = 0;
-      readConfig();
-      free(customSearch);
-      customSearch = NULL;
+      // readConfig(); <- why is this here?
       break;
 
     } else if (strncmp("-p", argv[i], 3) == 0) {

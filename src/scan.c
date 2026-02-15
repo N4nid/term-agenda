@@ -368,6 +368,7 @@ void *scanFile(void *threadWrapperStruct) {
     thisFile.isInitialized = 0;
     printf("no time format specified\nplease specify the time format used in "
            "the org files in the config\n");
+    exit(1);
     return NULL;
   }
 

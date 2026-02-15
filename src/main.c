@@ -13,10 +13,12 @@ void freeAllGlobals() {
   free(configPath);
   configPath = NULL;
 
-  for (int i = 0; i < searchAmount; i++) {
-    // printf("%s\n", org_agenda_files[i]);
-    free(searchString[i]);
-    searchString[i] = NULL;
+  if (searchString != NULL) {
+    for (int i = 0; i < searchAmount; i++) {
+      // printf("%s\n", org_agenda_files[i]);
+      free(searchString[i]);
+      searchString[i] = NULL;
+    }
   }
   free(searchString);
   searchString = NULL;
@@ -50,6 +52,9 @@ void freeAllGlobals() {
   }
   free(files);
   files = NULL;
+
+  free(customSearch);
+  customSearch = NULL;
 }
 
 void scanFiles() {
@@ -110,14 +115,22 @@ int main(int argc, char *argv[]) {
     readConfig();
   else
     printf("skipping config\n");
+
+  // no need to do more if there is no search specified
+  if (searchAmount == 0) {
+    return 0;
+  }
+
   // printf("------ agendafile amount: %d\n", agenda_files_amount);
   scanFiles();
 
   // char *s = "PROP==['state':'wip']";
   //  char *s = "TAG=='a'";
   //   char *s = "!(TAG=='a' | TAG=='b') & (TAG=='c'|TAG=='d')";
-  for (int i = 0; i < searchAmount; i++) {
-    search(searchString[i], files);
+  if (customSearch == NULL) {
+    for (int i = 0; i < searchAmount; i++) {
+      search(searchString[i], files);
+    }
   }
   return 0;
 }
