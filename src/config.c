@@ -18,7 +18,8 @@ int isSetMaxThreads = 0;
 int isSetHiddenDirInclusion = 0;
 int isSetTimeFormat = 0;
 
-char *searchString = NULL;
+size_t searchAmount = 0;
+char **searchString = NULL;
 int skipConfig = 0;
 char *customSearch = NULL;
 int customSearchLen = 0;
@@ -390,19 +391,42 @@ Further options are detailed in the example config\n\
 
 void setArgumentOptions(int argc, char *argv[]) {
   int setQuery = 0;
+
+  // count amount of querys
+  for (int i = 1; i < argc; i++) {
+    if (strncmp("-q", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+      searchAmount++;
+      i++;
+    }
+  }
+
+  // printf("search Amount %ld\n", searchAmount);
+  int searchIndex = 0;
+
   for (int i = 1; i < argc; i++) {
     // printf("%s\n", argv[i]);
     if (strncmp("-q", argv[i], 3) == 0) {
       if (argv[i + 1] == NULL)
         breakDueToMissingArg();
+
+      if (searchString == NULL) {
+        searchString = calloc(searchAmount, sizeof(char *));
+      }
+
       int len = strlen(argv[i + 1]);
-      searchString = calloc(len + 2, sizeof(char));
-      memcpy(searchString, argv[i + 1], len);
+      searchString[searchIndex] = calloc(len + 2, sizeof(char));
+
+      memcpy(searchString[searchIndex], argv[i + 1], len);
       setQuery = 1;
+      searchIndex++;
       i++;
+
     } else if (strncmp("-Q", argv[i], 3) == 0) {
       if (argv[i + 1] == NULL)
         breakDueToMissingArg();
+
       int len = strlen(argv[i + 1]);
       customSearchLen = len;
       customSearch = calloc(len + 2, sizeof(char));
@@ -412,9 +436,11 @@ void setArgumentOptions(int argc, char *argv[]) {
       free(customSearch);
       customSearch = NULL;
       break;
+
     } else if (strncmp("-p", argv[i], 3) == 0) {
       if (argv[i + 1] == NULL)
         breakDueToMissingArg();
+
       int len = strlen(argv[i + 1]);
       agenda_files_path = calloc(len + 2, sizeof(char));
       memcpy(agenda_files_path, argv[i + 1], len);
@@ -422,31 +448,40 @@ void setArgumentOptions(int argc, char *argv[]) {
       addAgendaFiles(agenda_files_path);
       i++;
       isSetAgendaFilesPath = 1;
+
     } else if (strncmp("-t", argv[i], 3) == 0) {
       if (argv[i + 1] == NULL)
         breakDueToMissingArg();
+
       todo_keywordsCSV = argv[i + 1];
       todo_keywords = split(todo_keywordsCSV, ",", &todo_keywords_amount);
       i++;
       isSetTodoKWDS = 1;
+
     } else if (strncmp("-f", argv[i], 3) == 0) {
       if (argv[i + 1] == NULL)
         breakDueToMissingArg();
+
       int len = strlen(argv[i + 1]);
       time_format = calloc(len + 2, sizeof(char));
       memcpy(time_format, argv[i + 1], len);
       isSetTimeFormat = 1;
       i++;
+
     } else if (strncmp("-r", argv[i], 3) == 0) {
       isSetRecAdding = 1;
       recursive_adding = 1;
+
     } else if (strncmp("-h", argv[i], 3) == 0) {
       printHelp();
+
     } else if (strncmp("-i", argv[i], 3) == 0) {
       isSetInheritance = 1;
       tag_inheritance = 0;
+
     } else if (strncmp("-s", argv[i], 3) == 0) {
       skipConfig = 1;
+
     } else if (strncmp("-T", argv[i], 3) == 0) {
       if (argv[i + 1] == NULL)
         breakDueToMissingArg();
@@ -457,10 +492,15 @@ void setArgumentOptions(int argc, char *argv[]) {
                "VALUE ! *\n*********************************\n");
         exit(-1);
       }
+
     } else if (strncmp("-a", argv[i], 3) == 0) {
       isSetHiddenDirInclusion = 1;
       includeHiddenDirs = 1;
     }
+  }
+
+  for (int i = 0; i < searchAmount; i++) {
+    // printf("-- search: %s", searchString[i]);
   }
 }
 

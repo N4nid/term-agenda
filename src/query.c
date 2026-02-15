@@ -37,7 +37,7 @@ int headingAmount = 0;
 struct headingMeta *headings;
 
 void printResult(int *result, int len) {
-  printf("matches:\n");
+  // printf("matches:\n");
   for (int i = 0; i < len; i++) {
     if (result[i] == 1) {
       // printf("%s", headings[i].name);
@@ -619,7 +619,7 @@ void search(char *search, struct fileMeta *files) {
   int nodeIndex = 0;
 
   string2searchTree(search, searchTree, &nodeIndex);
-  recPrintTree(searchTree->left, 0, 1);
+  // recPrintTree(searchTree->left, 0, 1);
 
   toFlatArray(files);
   int len = headingAmount;

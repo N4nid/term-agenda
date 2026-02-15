@@ -13,6 +13,11 @@ void freeAllGlobals() {
   free(configPath);
   configPath = NULL;
 
+  for (int i = 0; i < searchAmount; i++) {
+    // printf("%s\n", org_agenda_files[i]);
+    free(searchString[i]);
+    searchString[i] = NULL;
+  }
   free(searchString);
   searchString = NULL;
 
@@ -111,6 +116,8 @@ int main(int argc, char *argv[]) {
   // char *s = "PROP==['state':'wip']";
   //  char *s = "TAG=='a'";
   //   char *s = "!(TAG=='a' | TAG=='b') & (TAG=='c'|TAG=='d')";
-  search(searchString, files);
+  for (int i = 0; i < searchAmount; i++) {
+    search(searchString[i], files);
+  }
   return 0;
 }
