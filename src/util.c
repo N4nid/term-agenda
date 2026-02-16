@@ -5,6 +5,13 @@
 #include <sys/stat.h>
 #include <time.h>
 
+char *copy2str(char *src) {
+  int len = strlen(src);
+  char *str = calloc(len + 1, sizeof(char));
+  memcpy(str, src, len);
+  return str;
+}
+
 char *fixPath(char *path) {
   int pathLen = strlen(path);
   int addLeadingSlash = 0;
@@ -43,6 +50,7 @@ char *fixPath(char *path) {
       strncat(tmp, tmp2, pathLen); // append original path
 
       struct stat sfileInfo;
+      sfileInfo.st_mode = -1;
       stat(tmp, &sfileInfo);
       if (addLeadingSlash == 1 && sfileInfo.st_mode & S_IFDIR) {
         strncat(tmp, "/", 2);

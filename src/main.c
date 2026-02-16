@@ -45,6 +45,12 @@ void freeAllGlobals() {
   free(todo_keywords);
   todo_keywords = NULL;
 
+  free(agenda_files_path);
+  agenda_files_path = NULL;
+
+  free(todo_keywordsCSV);
+  todo_keywordsCSV = NULL;
+
   if (files != NULL) {
     for (int i = 0; i < agenda_files_amount; i++) {
       freeFileMeta(files[i]);
@@ -52,6 +58,10 @@ void freeAllGlobals() {
   }
   free(files);
   files = NULL;
+
+  if (searchOptions != NULL) {
+    freeSearchOption(searchOptions);
+  }
 
   free(customSearch);
   customSearch = NULL;
@@ -106,9 +116,17 @@ void scanFiles() {
   }
 }
 
+void setDefaults() {
+  char *kwds = "TODO,DONE";
+  todo_keywordsCSV = copy2str(kwds);
+  char *format = "%Y-%m-%d";
+  time_format = copy2str(format);
+}
+
 int main(int argc, char *argv[]) {
   atexit(freeAllGlobals);
 
+  setDefaults();
   createConfig();
   setArgumentOptions(argc, argv);
   if (skipConfig != 1)
@@ -121,16 +139,29 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  // printf("------ agendafile amount: %d\n", agenda_files_amount);
-  scanFiles();
-
-  // char *s = "PROP==['state':'wip']";
-  //  char *s = "TAG=='a'";
-  //   char *s = "!(TAG=='a' | TAG=='b') & (TAG=='c'|TAG=='d')";
-  if (customSearch == NULL) {
+  if (customSearch == NULL) { // "normal" search
+    scanFiles();
     for (int i = 0; i < searchAmount; i++) {
       search(searchString[i], files);
     }
+  } else { // custom Search
+
+    for (int i = 0; i < searchAmount; i++) {
+      loadOptions(searchOptions[i]);
+      scanFiles();
+      search(customSearchString, files);
+      if (files != NULL) {
+        for (int i = 0; i < agenda_files_amount; i++) {
+          freeFileMeta(files[i]);
+        }
+      }
+      free(files);
+      files = NULL;
+
+      free(customSearchString);
+      customSearchString = NULL;
+    }
   }
+
   return 0;
 }

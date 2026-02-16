@@ -2,7 +2,7 @@
 #define UTIL_H
 #include <stddef.h>
 struct searchOption {
-  char **searchString;
+  char *searchString;
   char *agenda_files_path;
   int recursive_adding;
   int includeHiddenDirs;
