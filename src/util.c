@@ -12,6 +12,21 @@ char *copy2str(char *src) {
   return str;
 }
 
+void freeStrArray(char ***array, size_t *len) {
+  if (array == NULL) {
+    return;
+  }
+
+  char **arr = *array;
+  for (int i = 0; i < *len; i++) {
+    free(arr[i]);
+    arr[i] = NULL;
+  }
+  free(arr);
+  *array = NULL;
+  *len = 0;
+}
+
 char *fixPath(char *path) {
   int pathLen = strlen(path);
   int addLeadingSlash = 0;

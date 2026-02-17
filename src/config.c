@@ -30,7 +30,7 @@ char *customSearchString = NULL;
 
 char *configPath = NULL;
 // helper vars
-int agenda_files_amount = 0;
+size_t agenda_files_amount = 0;
 size_t todo_keywords_amount = 0;
 char *agenda_files_path = NULL;
 // config options:
@@ -313,6 +313,10 @@ void loadOptions(struct searchOption options) {
   }
   if (options.agenda_files_path != NULL) {
     // printf("LOADED agenda_files_path: %s\n", options.agenda_files_path);
+
+    if (org_agenda_files != NULL) {
+      freeStrArray(&org_agenda_files, &agenda_files_amount);
+    }
     agenda_files_path = copy2str(options.agenda_files_path);
     agenda_files_amount = 0;
     addAgendaFiles(agenda_files_path);
@@ -329,6 +333,10 @@ void loadOptions(struct searchOption options) {
       free(todo_keywordsCSV);
     todo_keywordsCSV = copy2str(options.todo_keywordsCSV);
     // printf("LOADED todo_keywordsCSV: %s\n", todo_keywordsCSV);
+
+    if (todo_keywords != NULL) {
+      freeStrArray(&todo_keywords, &todo_keywords_amount);
+    }
     todo_keywords = split(todo_keywordsCSV, ",", &todo_keywords_amount);
   }
 }
@@ -363,14 +371,8 @@ void setCustomSearchOption(char *line, int index) {
 
   switch (optionType) {
   case 0: // org_agenda_files (filepath)
-    for (int i = 0; i < agenda_files_amount; i++) {
-      // printf("%s\n", org_agenda_files[i]);
-      free(org_agenda_files[i]);
-      org_agenda_files[i] = NULL;
-    }
-    free(org_agenda_files);
+    freeStrArray(&org_agenda_files, &agenda_files_amount);
     org_agenda_files = NULL;
-
     optionValue = fixPath(optionValue);
     searchOptions[index].agenda_files_path = copy2str(optionValue);
     break;
@@ -378,6 +380,7 @@ void setCustomSearchOption(char *line, int index) {
     searchOptions[index].max_threads = atoi(optionValue);
     break;
   case 3: // todo_keyword
+    freeStrArray(&todo_keywords, &todo_keywords_amount);
     searchOptions[index].todo_keywordsCSV = malloc(len * sizeof(char));
     memcpy(searchOptions[index].todo_keywordsCSV, optionValue, len);
     break;
@@ -439,7 +442,7 @@ void readConfig() {
     }
     if (customSearch != NULL && line[0] == customSearchDelim) {
       // if (line[0] == customSearchDelim) {
-      if (parsingCustomSearch == 1) {
+      if (parsingCustomSearch == 1 && hasCountedQueries) {
         parsingCustomSearch = 0;
         if (parsingTheRightOne == 1) { // is parsing the options
           parsingTheRightOne = 2;      // end parsing the search options
@@ -466,6 +469,7 @@ void readConfig() {
           // printf("-q:%s", line);
           searchAmount++;
         } else if (line[0] != '-' && line[0] != '#') { // no more queries
+
           hasCountedQueries = 1;
           fsetpos(file, &filePos);
           searchOptions = calloc(searchAmount, sizeof(struct searchOption));
@@ -614,6 +618,7 @@ void setArgumentOptions(int argc, char *argv[]) {
       memcpy(agenda_files_path, argv[i + 1], len);
       agenda_files_path = fixPath(agenda_files_path);
       addAgendaFiles(agenda_files_path);
+      agenda_files_path = NULL;
       i++;
       isSetAgendaFilesPath = 1;
 

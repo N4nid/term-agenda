@@ -626,7 +626,7 @@ void search(char *search, struct fileMeta *files) {
   int *results = calloc(len, sizeof(int));
   computeResult(searchTree->left, results, len);
 
-  printf("search: %s in %d files\n", search, agenda_files_amount);
+  printf("search: %s in %ld files\n", search, agenda_files_amount);
   printResult(results, len);
 
   free(results);

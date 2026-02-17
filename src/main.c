@@ -13,37 +13,11 @@ void freeAllGlobals() {
   free(configPath);
   configPath = NULL;
 
-  if (searchString != NULL) {
-    for (int i = 0; i < searchAmount; i++) {
-      // printf("%s\n", org_agenda_files[i]);
-      free(searchString[i]);
-      searchString[i] = NULL;
-    }
-  }
-  free(searchString);
-  searchString = NULL;
-
-  for (int i = 0; i < agenda_files_amount; i++) {
-    // printf("%s\n", org_agenda_files[i]);
-    free(org_agenda_files[i]);
-    org_agenda_files[i] = NULL;
-  }
-  free(org_agenda_files);
-  org_agenda_files = NULL;
-  // printf("%s\n", cache_dir);
   free(cache_dir);
   cache_dir = NULL;
 
-  for (int i = 0; i < todo_keywords_amount; i++) {
-    // printf("%s\n", org_agenda_files[i]);
-    free(todo_keywords[i]);
-    todo_keywords[i] = NULL;
-  }
   free(time_format);
   time_format = NULL;
-
-  free(todo_keywords);
-  todo_keywords = NULL;
 
   free(agenda_files_path);
   agenda_files_path = NULL;
@@ -51,16 +25,26 @@ void freeAllGlobals() {
   free(todo_keywordsCSV);
   todo_keywordsCSV = NULL;
 
+  freeSearchOption(searchOptions);
+
   if (files != NULL) {
     for (int i = 0; i < agenda_files_amount; i++) {
       freeFileMeta(files[i]);
     }
+    free(files);
+    files = NULL;
   }
-  free(files);
-  files = NULL;
 
-  if (searchOptions != NULL) {
-    freeSearchOption(searchOptions);
+  if (searchString != NULL) {
+    freeStrArray(&searchString, &searchAmount);
+  }
+
+  if (org_agenda_files != NULL) {
+    freeStrArray(&org_agenda_files, &agenda_files_amount);
+  }
+
+  if (todo_keywords != NULL) {
+    freeStrArray(&todo_keywords, &todo_keywords_amount);
   }
 
   free(customSearch);
@@ -123,6 +107,23 @@ void setDefaults() {
   time_format = copy2str(format);
 }
 
+void freeAfterSearch() {
+  // free stuff because it would be lost otherwise
+  // only necessary for customSearches
+  // since there the config values change per search (possibly)
+
+  if (files != NULL) {
+    for (int i = 0; i < agenda_files_amount; i++) {
+      freeFileMeta(files[i]);
+    }
+    free(files);
+    files = NULL;
+  }
+
+  free(customSearchString);
+  customSearchString = NULL;
+}
+
 int main(int argc, char *argv[]) {
   atexit(freeAllGlobals);
 
@@ -150,16 +151,7 @@ int main(int argc, char *argv[]) {
       loadOptions(searchOptions[i]);
       scanFiles();
       search(customSearchString, files);
-      if (files != NULL) {
-        for (int i = 0; i < agenda_files_amount; i++) {
-          freeFileMeta(files[i]);
-        }
-      }
-      free(files);
-      files = NULL;
-
-      free(customSearchString);
-      customSearchString = NULL;
+      freeAfterSearch();
     }
   }
 
