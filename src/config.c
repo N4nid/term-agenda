@@ -1,6 +1,8 @@
 #include "util.c"
 #include "util.h"
 #include <dirent.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,13 +41,136 @@ int includeHiddenDirs = 0;
 char **org_agenda_files = NULL;
 int recursive_adding = 1; // TODO document default
 char *cache_dir = NULL;
-int max_threads = 0;           // TODO document default
+int max_threads = 2;           // TODO document default
 int tag_inheritance = 1;       // 1 true, 0 false
 char *todo_keywordsCSV = NULL; // comma seperated list of todo-keywords
 char **todo_keywords = NULL;
 char *time_format = NULL; // fe. %Y-%m-%d
 
+atomic_int hasCountedFiles = 0;
+atomic_int threadAmount = 0;
+atomic_int agenda_index = 0;
+atomic_int filesAmount = 0;
+atomic_char **agendaFiles = NULL;
+
+void *addFiles(void *_path) {
+  char *path = (char *)_path;
+  int pathLen = strlen(path);
+
+  DIR *dir;
+  struct dirent *ent;
+
+  if ((dir = opendir(path)) != NULL) {
+
+    char *newPath;
+    int len = 0;
+    int dirCount = 0;
+
+    while ((ent = readdir(dir)) != NULL) {
+      char *extension = ent->d_name;
+      int filenameLen = strlen(extension);
+      extension = extension + (filenameLen - 4);
+
+      if (strncmp(extension, ".org", 4) == 0) { // is a org file
+        // printf(" ---- FILE:%s\n", ent->d_name);
+        if (hasCountedFiles == 1) {
+          len = pathLen + filenameLen + 2;
+          printf("HERE? %d\n", len);
+          agendaFiles[agenda_index] = calloc(len, sizeof(char));
+          //  memcpy(agendaFiles[agenda_index], path, pathLen);
+          //   memcpy(agendaFiles[agenda_index] + pathLen, ent->d_name,
+          //   filenameLen);
+          agenda_index++;
+
+        } else {
+          filesAmount++;
+        }
+      } // is a dir (exclude "." and "..")
+      else if (ent->d_type == DT_DIR && strncmp(ent->d_name, "..", 3) != 0 &&
+               strncmp(ent->d_name, ".", 2) != 0 && recursive_adding == 1) {
+
+        if ('.' == ent->d_name[0] && includeHiddenDirs == 0) {
+          continue;
+        }
+        dirCount++;
+
+        // printf("%s%s\n", path, ent->d_name);
+      }
+    }
+    rewinddir(dir);
+
+    if (dirCount > 0) {
+      // printf("%s DIRAMOUNT: %d\n", path, dirCount);
+      pthread_t threads[dirCount];
+      int threadIndex = 0;
+
+      while ((ent = readdir(dir)) != NULL) {
+
+        if (ent->d_type == DT_DIR && strncmp(ent->d_name, "..", 3) != 0 &&
+            strncmp(ent->d_name, ".", 2) != 0 && recursive_adding == 1) {
+
+          int filenameLen = strlen(ent->d_name);
+
+          if ('.' == ent->d_name[0] && includeHiddenDirs == 0) {
+            continue;
+          }
+          len = pathLen + filenameLen + 2;
+          newPath = calloc(len, sizeof(char));
+          memcpy(newPath, path, pathLen);
+          strncat(newPath, ent->d_name, filenameLen);
+          strncat(newPath, "/", 2);
+
+          // printf(" in DIR:%s\n", ent->d_name);
+          // printf("started: %d\n", threadIndex);
+          if (threadAmount < max_threads) {
+            pthread_create(&threads[threadIndex], NULL, addFiles, newPath);
+            threadAmount++;
+            threadIndex++;
+          } else {
+            addFiles(newPath);
+          }
+
+          // newPath = NULL;
+        }
+      }
+      for (int i = 0; i < threadIndex; i++) {
+        pthread_join(threads[i], NULL);
+        threadAmount--;
+        // printf("++ waiting for: %d\n", i);
+      }
+    }
+    closedir(dir);
+    dir = NULL;
+
+  } else {
+    struct stat sfileInfo;
+    stat(path, &sfileInfo);
+
+    if (sfileInfo.st_mode & S_IFDIR) { // is a dir
+      printf("-- could not open dir ! --\n");
+    } else {
+      filesAmount = 1;
+    }
+  }
+
+  free(path);
+  path = NULL;
+  return NULL;
+}
+
 void addAgendaFiles(char *path) {
+  char *copy = copy2str(path);
+  agenda_files_amount = 0;
+  addFiles(path);
+  hasCountedFiles = 1;
+  printf("AMOUNT: %d\n", filesAmount);
+
+  agendaFiles = calloc(agenda_files_amount, sizeof(char *));
+
+  addFiles(copy);
+}
+
+void addAgendaFilesOLD(char *path) {
   int pathLen = strlen(path);
 
   struct stat sfileInfo;
@@ -78,7 +203,7 @@ void addAgendaFiles(char *path) {
           size = (agenda_files_amount + 1) * sizeof(org_agenda_files);
           char **tmp = realloc(org_agenda_files, size);
           if (tmp) {
-            org_agenda_files = tmp;
+            // org_agenda_files = tmp;
           }
 
           len = pathLen + filenameLen + 2;

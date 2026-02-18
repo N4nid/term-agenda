@@ -2,6 +2,7 @@
 #include "util.h"
 #include <assert.h>
 #include <pthread.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -126,6 +127,10 @@ void freeAfterSearch() {
 
 int main(int argc, char *argv[]) {
   atexit(freeAllGlobals);
+  char *s = "/home/nanid/org/";
+  char *p = copy2str(s);
+  addAgendaFiles(p);
+  exit(0);
 
   setDefaults();
   createConfig();

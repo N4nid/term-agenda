@@ -1,6 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 #include <stddef.h>
+
 struct searchOption {
   char *searchString;
   char *agenda_files_path;
