@@ -41,7 +41,7 @@ int includeHiddenDirs = 0;
 char **org_agenda_files = NULL;
 int recursive_adding = 1; // TODO document default
 char *cache_dir = NULL;
-int max_threads = 2;           // TODO document default
+int max_threads = 50;          // TODO document default
 int tag_inheritance = 1;       // 1 true, 0 false
 char *todo_keywordsCSV = NULL; // comma seperated list of todo-keywords
 char **todo_keywords = NULL;
@@ -51,7 +51,7 @@ atomic_int hasCountedFiles = 0;
 atomic_int threadAmount = 0;
 atomic_int agenda_index = 0;
 atomic_int filesAmount = 0;
-atomic_char **agendaFiles = NULL;
+pthread_mutex_t lock;
 
 void *addFiles(void *_path) {
   char *path = (char *)_path;
@@ -72,15 +72,26 @@ void *addFiles(void *_path) {
       extension = extension + (filenameLen - 4);
 
       if (strncmp(extension, ".org", 4) == 0) { // is a org file
-        // printf(" ---- FILE:%s\n", ent->d_name);
-        if (hasCountedFiles == 1) {
-          len = pathLen + filenameLen + 2;
-          printf("HERE? %d\n", len);
-          agendaFiles[agenda_index] = calloc(len, sizeof(char));
-          //  memcpy(agendaFiles[agenda_index], path, pathLen);
-          //   memcpy(agendaFiles[agenda_index] + pathLen, ent->d_name,
-          //   filenameLen);
-          agenda_index++;
+        if (hasCountedFiles == 1) {             // addFiles to org_agenda_files
+          if (agenda_index < filesAmount) {
+            // printf("%s%s\n", path, ent->d_name);
+            //  printf("%s\n", ent->d_name);
+            len = pathLen + filenameLen + 2;
+
+            // so only one thread can write to the array at a time
+            // prevents undefined behavior
+            pthread_mutex_lock(&lock);
+
+            org_agenda_files[agenda_index] = calloc(len, sizeof(char));
+            memcpy(org_agenda_files[agenda_index], path, pathLen);
+            memcpy(org_agenda_files[agenda_index] + pathLen, ent->d_name,
+                   filenameLen);
+            agenda_index++;
+            pthread_mutex_unlock(&lock);
+
+          } else {
+            printf("OUT OF BOUNDS WTF\n");
+          }
 
         } else {
           filesAmount++;
@@ -97,6 +108,8 @@ void *addFiles(void *_path) {
         // printf("%s%s\n", path, ent->d_name);
       }
     }
+
+    // reset to start of dir as to avoid opening the dir stream again
     rewinddir(dir);
 
     if (dirCount > 0) {
@@ -160,100 +173,27 @@ void *addFiles(void *_path) {
 
 void addAgendaFiles(char *path) {
   char *copy = copy2str(path);
-  agenda_files_amount = 0;
+  filesAmount = 0;
+
+  hasCountedFiles = 0;
   addFiles(path);
   hasCountedFiles = 1;
-  printf("AMOUNT: %d\n", filesAmount);
 
-  agendaFiles = calloc(agenda_files_amount, sizeof(char *));
+  // printf("add %s\n", copy);
+  // printf("AMOUNT: %d\n", filesAmount);
+
+  agenda_files_amount = filesAmount;
+  agenda_index = 0;
+  pthread_mutex_init(&lock, NULL);
+
+  if (org_agenda_files != NULL) {
+    freeStrArray(&org_agenda_files, &agenda_files_amount);
+  }
+  org_agenda_files = calloc(filesAmount, sizeof(char *));
 
   addFiles(copy);
-}
 
-void addAgendaFilesOLD(char *path) {
-  int pathLen = strlen(path);
-
-  struct stat sfileInfo;
-  stat(path, &sfileInfo);
-
-  if (sfileInfo.st_mode & S_IFDIR) { // is a dir
-    // printf("  IS A DIR\n");
-    //  borrowed from
-    //  https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
-    DIR *dir;
-    struct dirent *ent;
-
-    if ((dir = opendir(path)) != NULL) {
-
-      if (org_agenda_files == NULL) {
-        org_agenda_files = malloc(sizeof(char *));
-      }
-      size_t size;
-
-      char *newPath;
-      int len = 0;
-      while ((ent = readdir(dir)) != NULL) {
-        char *extension = ent->d_name;
-        int filenameLen = strlen(extension);
-        extension = extension + (filenameLen - 4);
-
-        if (strncmp(extension, ".org", 4) == 0) { // is a org file
-          // printf(" ---- FILE:%s\n", ent->d_name);
-          //  resize array
-          size = (agenda_files_amount + 1) * sizeof(org_agenda_files);
-          char **tmp = realloc(org_agenda_files, size);
-          if (tmp) {
-            // org_agenda_files = tmp;
-          }
-
-          len = pathLen + filenameLen + 2;
-          org_agenda_files[agenda_files_amount] = calloc(len, sizeof(char));
-          memcpy(org_agenda_files[agenda_files_amount], path, pathLen);
-          memcpy(org_agenda_files[agenda_files_amount] + pathLen, ent->d_name,
-                 filenameLen);
-          // strncat(org_agenda_files[agenda_files_amount], ent->d_name,
-          // filenameLen);
-
-          agenda_files_amount++;
-        } // is a dir (exclude "." and "..")
-        else if (ent->d_type == DT_DIR && strncmp(ent->d_name, "..", 3) != 0 &&
-                 strncmp(ent->d_name, ".", 2) != 0 && recursive_adding == 1) {
-
-          if ('.' == ent->d_name[0] && includeHiddenDirs == 0) {
-            continue;
-          }
-
-          len = pathLen + filenameLen + 2;
-          newPath = calloc(len, sizeof(char));
-          memcpy(newPath, path, pathLen);
-          strncat(newPath, ent->d_name, filenameLen);
-          strncat(newPath, "/", 2);
-          // printf(" -------- DIRPATH:|%s|\n", newPath);
-
-          // printf("+ GOING :C\n");
-          addAgendaFiles(newPath);
-          // printf("+ IM BACK :D\n");
-          newPath = NULL;
-        }
-      }
-      closedir(dir);
-      dir = NULL;
-
-    } else {
-      printf("-- could not open dir ! --\n");
-    }
-  } else { // is a file
-    // printf(" -IS A FILE\n");
-    org_agenda_files = malloc(1 * sizeof(org_agenda_files));
-
-    org_agenda_files[0] = calloc(pathLen + 1, sizeof(char));
-    memcpy(org_agenda_files[0], path, pathLen);
-
-    agenda_files_amount = 1;
-  }
-
-  free(path);
-  path = NULL;
+  pthread_mutex_destroy(&lock);
 }
 
 int getOptionType(char *optionString, int *optionLen) {
@@ -307,7 +247,9 @@ void setConfigValue(char *optionString) {
       break;
     }
     optionValue = fixPath(optionValue);
-    addAgendaFiles(optionValue);
+    // addAgendaFiles(optionValue);
+    agenda_files_path = copy2str(optionValue);
+    free(optionValue);
     optionValue = NULL;
     break;
   case 1: // cache_dir
@@ -441,6 +383,9 @@ void loadOptions(struct searchOption options) {
 
     if (org_agenda_files != NULL) {
       freeStrArray(&org_agenda_files, &agenda_files_amount);
+    }
+    if (agenda_files_path != NULL) {
+      free(agenda_files_path);
     }
     agenda_files_path = copy2str(options.agenda_files_path);
     agenda_files_amount = 0;

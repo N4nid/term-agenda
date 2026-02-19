@@ -56,6 +56,14 @@ void scanFiles() {
   // see vvv for more info
   // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/ThreadArgs.html
 
+  // since we dont call addAgendaFiles when reading the config files
+  // we have to catch the case in which no other path is specified
+  // by the args or the customSearch
+  if (agenda_files_path != NULL && org_agenda_files == NULL) {
+    addAgendaFiles(agenda_files_path);
+    agenda_files_path = NULL;
+  }
+
   int max = max_threads;
   if (max_threads == 0) {
     max = agenda_files_amount;
@@ -127,10 +135,10 @@ void freeAfterSearch() {
 
 int main(int argc, char *argv[]) {
   atexit(freeAllGlobals);
-  char *s = "/home/nanid/org/";
-  char *p = copy2str(s);
-  addAgendaFiles(p);
-  exit(0);
+  // char *s = "/home/nanid/org/";
+  // char *p = copy2str(s);
+  // addAgendaFiles(p);
+  // exit(0);
 
   setDefaults();
   createConfig();
