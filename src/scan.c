@@ -301,6 +301,7 @@ char *getScheduledDate(char *line, char *kwd, size_t *dateSize,
   // printf(" .........|%s|\n", dateStr);
 
   struct tm parsed_time = {0};
+  // printf("%s\n", time_format);
   strptime(dateStr, time_format, &parsed_time);
   char buffer[internalTmFLen];
   strftime(buffer, sizeof(buffer), internalTimeFormat, &parsed_time);

@@ -161,6 +161,7 @@ void *addFiles(void *_path) {
 
     if (sfileInfo.st_mode & S_IFDIR) { // is a dir
       printf("-- could not open dir ! --\n");
+      exit(0);
     } else {
       filesAmount = 1;
     }

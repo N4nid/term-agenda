@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 struct node {
   char *value;
@@ -466,7 +467,12 @@ char *getSimpleField(int field, struct headingMeta *heading) {
 }
 
 int matchNum(long this, long should, int matchType) {
-  if (matchType == greaterOrEq) {
+  // printf("%d this: %ld should: %ld\n", matchType, this, should);
+  if (matchType == exact) {
+    if (this == should) {
+      return 1;
+    }
+  } else if (matchType == greaterOrEq) {
     if (this >= should) {
       return 1;
     }
@@ -500,6 +506,39 @@ int matchString(char *this, char *should, int matchType) {
   return 0;
 }
 
+// here the fancy time stuff happens
+long timeToLong(char *val) {
+  struct tm parsed_time = {0};
+
+  // is a offset
+  if ('+' == val[0] || '-' == val[0]) {
+  } else {
+    // set time to tdy
+    time_t t = time(NULL);
+    parsed_time = *localtime(&t);
+
+    // so its just the date (hrs & mins = 0)
+    parsed_time.tm_hour = 0;
+    parsed_time.tm_min = 0;
+
+    if (strncmp("now", val, 3) == 0) {
+      parsed_time = *localtime(&t); // reset so it keeps the hrs and mins
+    } else if (strncmp("tmr", val, 3) == 0) {
+      parsed_time.tm_mday++;
+    } else if (strncmp("ytd", val, 3) == 0) {
+      parsed_time.tm_mday--;
+    } else { // a normal date (2012-02-22)
+      strptime(val, time_format, &parsed_time);
+    }
+    mktime(&parsed_time); // normalize it
+  }
+
+  char buffer[internalTmFLen];
+  strftime(buffer, sizeof(buffer), internalTimeFormat, &parsed_time);
+  // printf("TIME: %s\n", buffer);
+  return atol(buffer);
+}
+
 void check(int *result, int field, char *value, int matchType) {
   char *val = value;
   int gotBetween = 0;
@@ -521,28 +560,22 @@ void check(int *result, int field, char *value, int matchType) {
       char *headingVal = getSimpleField(field, &headings[i]);
       if (headingVal == NULL)
         continue;
-      if (matchType == exact || matchType == contains) {
-        result[i] = matchString(headingVal, val, matchType);
-        // printf("|%s| = |%s|\n", headingVal, val);
-      } else if (field == scheduled || field == deadline) { // TODO
+
+      if (field == scheduled || field == deadline) {
         long headingNumVal = 0;
         long valNum = -1;
         if (field == scheduled)
           headingNumVal = headings[i].scheduledNum;
         else
           headingNumVal = headings[i].deadlineNum;
-        // printf("|%s| = |%s|\n", headingVal, val);
 
         // convert given date into num
-        struct tm parsed_time = {0};
-        strptime(val, time_format, &parsed_time);
-        char buffer[internalTmFLen];
-        strftime(buffer, sizeof(buffer), internalTimeFormat, &parsed_time);
-        valNum = atol(buffer);
-        // printf("|%ld| = |%ld|\n", headingNumVal, valNum);
-        // printf("------\n");
+        valNum = timeToLong(val);
 
         result[i] = matchNum(headingNumVal, valNum, matchType);
+      } else if (matchType == exact || matchType == contains) {
+        result[i] = matchString(headingVal, val, matchType);
+        // printf("|%s| = |%s|\n", headingVal, val);
       } else { // can only match other fields with exact or conatins
         result[i] = 0;
       }
