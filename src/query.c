@@ -30,6 +30,8 @@ const int exact = 1;       // ==
 const int contains = 2;    // ~=
 const int greaterOrEq = 3; // >=
 const int lesserOrEq = 4;  // <=
+const int greater = 5;     // >
+const int lesser = 6;      // <
 
 int nodeAmount = 0;
 struct node *nodes;
@@ -185,16 +187,30 @@ int setStatmentNode(char *input, int inputLen, struct node *node) {
     if (current == '\0')
       return 0;
   }
+
+  int offset = 0;
+  int skipAmount = 2;
+
+  if ('=' != input[index + 1]) { // is a single char eg. "<" or ">"
+    offset = 2;
+    // since the constants are only numbers we can change 'lesserOrEq' to
+    // 'lesser' by adding 2
+
+    skipAmount = 1;
+    // since the next character could be important now eg. "(" or smthn
+  }
+
   if (current == '~')
     node->matchType = contains;
   else if (current == '=')
     node->matchType = exact;
   else if (current == '<')
-    node->matchType = lesserOrEq;
+    node->matchType =
+        lesserOrEq + offset; // so that "<" and "<=" can be distinguished
   else if (current == '>')
-    node->matchType = greaterOrEq;
+    node->matchType = greaterOrEq + offset;
 
-  index += 2;
+  index += skipAmount;
   current = input[index];
   while (current == ' ') {
     index++;
@@ -458,6 +474,14 @@ int matchNum(long this, long should, int matchType) {
     if (this <= should) {
       return 1;
     }
+  } else if (matchType == greater) {
+    if (this > should) {
+      return 1;
+    }
+  } else if (matchType == lesser) {
+    if (this < should) {
+      return 1;
+    }
   }
   return 0;
 }
@@ -500,7 +524,7 @@ void check(int *result, int field, char *value, int matchType) {
       if (matchType == exact || matchType == contains) {
         result[i] = matchString(headingVal, val, matchType);
         // printf("|%s| = |%s|\n", headingVal, val);
-      } else if (field == scheduled || field == deadline) {
+      } else if (field == scheduled || field == deadline) { // TODO
         long headingNumVal = 0;
         long valNum = -1;
         if (field == scheduled)
