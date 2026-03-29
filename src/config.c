@@ -164,6 +164,23 @@ void *addFiles(void *_path) {
       exit(0);
     } else {
       filesAmount = 1;
+      if (hasCountedFiles) {
+        printf("HERE\n");
+        char *extension = path;
+        extension = extension + (pathLen - 4);
+
+        if (strncmp(extension, ".org", 4) == 0) { // is a org file
+          // int len = pathLen + filenameLen + 2;
+
+          // so only one thread can write to the array at a time
+          // prevents undefined behavior
+          pthread_mutex_lock(&lock);
+
+          org_agenda_files[0] = calloc(pathLen + 1, sizeof(char));
+          memcpy(org_agenda_files[0], path, pathLen);
+          pthread_mutex_unlock(&lock);
+        }
+      }
     }
   }
 

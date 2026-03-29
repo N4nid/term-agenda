@@ -41,7 +41,6 @@ int countHeadings(FILE *file) {
   char *line = NULL;
   size_t linesize = 0;
   int lineNum = 0;
-  int headingLvl = -1;
   int headingCounter = 0;
   int lvl = -1;
 
@@ -49,6 +48,7 @@ int countHeadings(FILE *file) {
   while (lineNum >= 0) { // loop through file
     lvl = getHeadingLvl(line);
 
+    // if ('*' != line[0]) { // is a heading
     if (lvl > 0) { // is a heading
       headingCounter++;
     }
@@ -363,6 +363,7 @@ void *scanFile(void *threadWrapperStruct) {
   // struct fileMeta thisFile;
   if (path == NULL) {
     thisFile.isInitialized = 0;
+    printf("ERROR path is NULL\n");
     return NULL;
   }
   if (time_format == NULL) {
