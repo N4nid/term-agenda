@@ -5,11 +5,43 @@
 #include <sys/stat.h>
 #include <time.h>
 
-char *copy2str(char *src) {
-  int len = strlen(src);
-  char *str = calloc(len + 1, sizeof(char));
-  memcpy(str, src, len);
-  return str;
+// obsolete since i now know strdup exists
+// char *copy2str(char *src) {
+//  int len = strlen(src);
+//  char *str = calloc(len + 1, sizeof(char));
+//  memcpy(str, src, len);
+//  return str;
+//}
+
+// inspired from
+// https://stackoverflow.com/questions/8257714/how-can-i-convert-an-int-to-a-string-in-c
+size_t numCharAmount(int num) { return snprintf(NULL, 0, "%d", num); }
+
+void replaceWith(char **src, size_t *srcLen, char *this,
+                 char *that) { // replace this with that
+  char *found = strstr(*src, this);
+  if (found == NULL) {
+    return;
+  }
+
+  size_t thisLen = strlen(this);
+  size_t thatLen = strlen(that);
+
+  size_t foundLen = strlen(found);
+  size_t newSize = (*srcLen - thisLen) + thatLen;
+  char *result = calloc(newSize + 1, sizeof(char));
+
+  strncpy(result, *src,
+          (*srcLen - foundLen)); // copy the part before the occourence
+  strncat(result, that, thatLen);
+  strncat(result, found + thisLen, foundLen - thisLen);
+
+  // printf("%s\n", result);
+
+  *srcLen = newSize;
+
+  free(*src);
+  *src = result;
 }
 
 void freeStrArray(char ***array, size_t *len) {

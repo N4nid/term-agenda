@@ -39,13 +39,35 @@ struct node *nodes;
 int headingAmount = 0;
 struct headingMeta *headings;
 
+void printCustomOutput(int index) {
+  // do the simple replacements
+  char *output = strdup(customOutput);
+  size_t len = strlen(output);
+
+  // heading (name)
+  replaceWith(&output, &len, "%h", headings[index].name);
+
+  // lineNum
+  char lineNum[numCharAmount(headings[index].lineNum) + 1];
+  sprintf(lineNum, "%d", headings[index].lineNum);
+  replaceWith(&output, &len, "%l", lineNum);
+
+  // path
+  replaceWith(&output, &len, "%F", headings[index].path);
+  printf("%s\n", output);
+  free(output);
+}
+
 void printResult(int *result, int len) {
   // printf("matches:\n");
   for (int i = 0; i < len; i++) {
     if (result[i] == 1) {
-      // printf("%s", headings[i].name);
-      printf("%d %s -> %s\n", headings[i].lineNum, headings[i].name,
-             headings[i].path);
+      if (customOutput != NULL) {
+        printCustomOutput(i);
+      } else {
+        printf("%d %s -> %s\n", headings[i].lineNum, headings[i].name,
+               headings[i].path);
+      }
     }
   }
   printf("\n");

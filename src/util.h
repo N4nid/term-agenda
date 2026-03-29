@@ -11,6 +11,7 @@ struct searchOption {
   int max_threads;
   char *todo_keywordsCSV; // comma seperated list of todo-keywords
   char *time_format;      // fe. %Y-%m-%d
+  char *customOutput;     // fe. %l %h
   // char *cache_dir;
 };
 struct headingMeta {

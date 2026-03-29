@@ -26,6 +26,9 @@ void freeAllGlobals() {
   free(todo_keywordsCSV);
   todo_keywordsCSV = NULL;
 
+  free(customOutput);
+  customOutput = NULL;
+
   freeSearchOption(searchOptions);
 
   if (files != NULL) {
@@ -111,9 +114,11 @@ void scanFiles() {
 
 void setDefaults() {
   char *kwds = "TODO,DONE";
-  todo_keywordsCSV = copy2str(kwds);
+  todo_keywordsCSV = strdup(kwds);
   char *format = "%Y-%m-%d";
-  time_format = copy2str(format);
+  time_format = strdup(format);
+  //  char *output = "%l %h -> %F";
+  //  customOutput = copy2str(output);
 }
 
 void freeAfterSearch() {
