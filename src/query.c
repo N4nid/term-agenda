@@ -507,31 +507,43 @@ int matchString(char *this, char *should, int matchType) {
 }
 
 // here the fancy time stuff happens
-long timeToLong(char *val) {
+long timeToLong(char *val, int *respectHrs) {
   struct tm parsed_time = {0};
+  // set time to tdy
+  time_t t = time(NULL);
+  parsed_time = *localtime(&t);
 
   // is a offset
   if ('+' == val[0] || '-' == val[0]) {
+    int offset = atoi(val); // atoi ignores trailing letters
+    // printf("OFFSET: %d\n", offset);
+
+    // hour, day, week, month, year
+    if (strstr(val, "d")) {
+      parsed_time.tm_mday += offset;
+    } else if (strstr(val, "w")) {
+      parsed_time.tm_mday += offset * 7;
+    } else if (strstr(val, "m")) {
+      parsed_time.tm_mon += offset;
+    } else if (strstr(val, "h")) {
+      *respectHrs = 1;
+      parsed_time.tm_hour += offset;
+    } else if (strstr(val, "y")) {
+      parsed_time.tm_year += offset;
+    }
   } else {
-    // set time to tdy
-    time_t t = time(NULL);
-    parsed_time = *localtime(&t);
-
-    // so its just the date (hrs & mins = 0)
-    parsed_time.tm_hour = 0;
-    parsed_time.tm_min = 0;
-
     if (strncmp("now", val, 3) == 0) {
-      parsed_time = *localtime(&t); // reset so it keeps the hrs and mins
+      *respectHrs = 1;
     } else if (strncmp("tmr", val, 3) == 0) {
       parsed_time.tm_mday++;
     } else if (strncmp("ytd", val, 3) == 0) {
       parsed_time.tm_mday--;
-    } else { // a normal date (2012-02-22)
+    } else if (strncmp("tdy", val, 3) != 0) { // a normal date (2012-02-22)
       strptime(val, time_format, &parsed_time);
     }
-    mktime(&parsed_time); // normalize it
   }
+
+  mktime(&parsed_time); // normalize it
 
   char buffer[internalTmFLen];
   strftime(buffer, sizeof(buffer), internalTimeFormat, &parsed_time);
@@ -570,7 +582,13 @@ void check(int *result, int field, char *value, int matchType) {
           headingNumVal = headings[i].deadlineNum;
 
         // convert given date into num
-        valNum = timeToLong(val);
+        int respectHrs = 0;
+        valNum = timeToLong(val, &respectHrs);
+
+        if (!respectHrs) {
+          headingNumVal /= 10000;
+          valNum /= 10000;
+        }
 
         result[i] = matchNum(headingNumVal, valNum, matchType);
       } else if (matchType == exact || matchType == contains) {
