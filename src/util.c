@@ -5,17 +5,30 @@
 #include <sys/stat.h>
 #include <time.h>
 
-// obsolete since i now know strdup exists
-// char *copy2str(char *src) {
-//  int len = strlen(src);
-//  char *str = calloc(len + 1, sizeof(char));
-//  memcpy(str, src, len);
-//  return str;
-//}
+// uses strlen when passing -1 as len
+char *copy2str(char *src, size_t len) {
+  if (src == NULL) {
+    return NULL;
+  }
+  if (len == -1) {
+    len = strlen(src);
+  }
+  char *str = calloc(len + 1, sizeof(char));
+  memcpy(str, src, len);
+  return str;
+}
 
 // inspired from
 // https://stackoverflow.com/questions/8257714/how-can-i-convert-an-int-to-a-string-in-c
 size_t numCharAmount(int num) { return snprintf(NULL, 0, "%d", num); }
+
+// return "" if given str is NULL
+char *emptyIfNull(char *str) {
+  if (str == NULL) {
+    return "";
+  }
+  return str;
+}
 
 void replaceWith(char **src, size_t *srcLen, char *this,
                  char *that) { // replace this with that

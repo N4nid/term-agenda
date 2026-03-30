@@ -20,7 +20,8 @@ struct headingMeta {
   char *name;
   char **tags;
   size_t tagsAmount;
-  char *todokwd; // fe. TODO, DONE
+  char *todokwd;  // fe. TODO, DONE
+  char *priority; // fe. [#A] or [#B]
   char *scheduled;
   size_t scheduledNum;
   char *deadline;

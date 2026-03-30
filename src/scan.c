@@ -88,6 +88,13 @@ void freeFileMeta(struct fileMeta file) {
       file.headings[i].deadline = NULL;
     }
 
+    if (file.headings[i].priority != NULL) {
+      if (debug)
+        printf("  priority: %s\n", file.headings[i].priority);
+      free(file.headings[i].priority);
+      file.headings[i].priority = NULL;
+    }
+
     if (file.headings[i].todokwd != NULL) {
       if (debug)
         printf("  todokwd: %s\n", file.headings[i].todokwd);
@@ -125,6 +132,19 @@ void freeFileMeta(struct fileMeta file) {
   }
   free(file.headings);
   file.headings = NULL;
+}
+
+char *getPriority(char *heading, size_t headingLen) {
+  // TODO make configurable
+  char *prios[] = {"[#A]", "[#B]", "[#C]"};
+
+  for (int i = 0; i < ARRAY_SIZE(prios); i++) {
+    if (strstr(heading, prios[i]) != NULL) {
+      return prios[i];
+    }
+  }
+
+  return NULL;
 }
 
 char *getTodoKeyw(char *heading, size_t *todoKwdSize) {
@@ -408,7 +428,8 @@ void *scanFile(void *threadWrapperStruct) {
 
     lvl = getHeadingLvl(line);
 
-    if (lvl > 0 && parsingProperties == 0) { // is a heading
+    //-------------------------------------------- is a heading
+    if (lvl > 0 && parsingProperties == 0) {
       headingCount++;
       thisFile.headings[headingCount].lineNum = lineNum;
 
@@ -430,6 +451,10 @@ void *scanFile(void *threadWrapperStruct) {
       } else { // has to be NULL since it by default points somewhere else.
         thisFile.headings[headingCount].todokwd = NULL;
       }
+
+      // handle priorities
+      char *prio = getPriority(lineWithoutAsterisk, newsize);
+      thisFile.headings[headingCount].priority = copy2str(prio, -1);
 
       // handle tags
       size_t tagAmount = -1;
@@ -459,7 +484,7 @@ void *scanFile(void *threadWrapperStruct) {
       thisFile.headings[headingCount].deadlineNum = 0;
       thisFile.headings[headingCount].scheduledNum = 0;
 
-    } else {
+    } else { //-------------------------------------------- is not a heading
 
       // check for ":properties:"
       if (lineLen >= 12 && parsingProperties == 0 && headingCount >= 0) {

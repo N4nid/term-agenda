@@ -54,6 +54,20 @@ void printCustomOutput(int index) {
 
   // path
   replaceWith(&output, &len, "%F", headings[index].path);
+
+  // filename
+  replaceWith(&output, &len, "%f", basename(headings[index].path));
+
+  // scheduled/deadline
+  replaceWith(&output, &len, "%s", emptyIfNull(headings[index].scheduled));
+  replaceWith(&output, &len, "%d", emptyIfNull(headings[index].deadline));
+
+  // priority
+  replaceWith(&output, &len, "%p", emptyIfNull(headings[index].priority));
+
+  // TODO kwd
+  replaceWith(&output, &len, "%t", emptyIfNull(headings[index].todokwd));
+
   printf("%s\n", output);
   free(output);
 }
