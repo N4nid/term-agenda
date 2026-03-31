@@ -18,9 +18,15 @@ char *copy2str(char *src, size_t len) {
   return str;
 }
 
-// inspired from
-// https://stackoverflow.com/questions/8257714/how-can-i-convert-an-int-to-a-string-in-c
-size_t numCharAmount(int num) { return snprintf(NULL, 0, "%d", num); }
+// return allocated str representing int
+char *itoa(int num) {
+  // inspired from
+  // https://stackoverflow.com/questions/8257714/how-can-i-convert-an-int-to-a-string-in-c
+  int len = snprintf(NULL, 0, "%d", num);
+  char *str = calloc(len + 1, sizeof(char));
+  sprintf(str, "%d", num);
+  return str;
+}
 
 // return "" if given str is NULL
 char *emptyIfNull(char *str) {

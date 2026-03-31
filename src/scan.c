@@ -134,12 +134,20 @@ void freeFileMeta(struct fileMeta file) {
   file.headings = NULL;
 }
 
-char *getPriority(char *heading, size_t headingLen) {
-  // TODO make configurable
-  char *prios[] = {"[#A]", "[#B]", "[#C]"};
+int getPrioLvl(char prio) {
+  for (int i = 0; i < ARRAY_SIZE(priosChars); i++) {
+    if (priosChars[i] == prio) {
+      return i;
+    }
+  }
+  return prioBaseLvl;
+}
 
+char *getPriority(char *heading, size_t headingLen, int *prioLvl) {
+  // TODO make configurable
   for (int i = 0; i < ARRAY_SIZE(prios); i++) {
     if (strstr(heading, prios[i]) != NULL) {
+      *prioLvl = i;
       return prios[i];
     }
   }
@@ -453,8 +461,10 @@ void *scanFile(void *threadWrapperStruct) {
       }
 
       // handle priorities
-      char *prio = getPriority(lineWithoutAsterisk, newsize);
+      int prioLvl = prioBaseLvl;
+      char *prio = getPriority(lineWithoutAsterisk, newsize, &prioLvl);
       thisFile.headings[headingCount].priority = copy2str(prio, -1);
+      thisFile.headings[headingCount].prioLvl = prioLvl;
 
       // handle tags
       size_t tagAmount = -1;

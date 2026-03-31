@@ -47,6 +47,9 @@ char *todo_keywordsCSV = NULL; // comma seperated list of todo-keywords
 char **todo_keywords = NULL;
 char *time_format = NULL;  // fe. %Y-%m-%d
 char *customOutput = NULL; // how the output should look like
+char *prios[] = {"[#C]", "[#B]", "[#A]"};
+char priosChars[] = {'C', 'B', 'A'};
+int prioBaseLvl = 1;
 
 atomic_int hasCountedFiles = 0;
 atomic_int threadAmount = 0;
@@ -651,8 +654,13 @@ fields:\n\
   PROP\n\
 \n\
 match types:\n\
+  not equal: !=\n\
   exact: ==\n\
   contains: ~=\n\
+  less than: <\n\
+  greater than: >\n\
+  less or equal: <=\n\
+  greater or equal: >=\n\
 \n\
 logical operators:\n\
   and &\n\

@@ -26,6 +26,7 @@ const int scheduled = 3;
 const int deadline = 4;
 const int property = 5;
 const int name = 6;
+const int prio = 7;
 // matchTypes constants
 const int exact = 1;       // ==
 const int contains = 2;    // ~=
@@ -33,6 +34,7 @@ const int greaterOrEq = 3; // >=
 const int lesserOrEq = 4;  // <=
 const int greater = 5;     // >
 const int lesser = 6;      // <
+const int noteq = 7;       // !=
 
 int nodeAmount = 0;
 struct node *nodes;
@@ -48,9 +50,9 @@ void printCustomOutput(int index) {
   replaceWith(&output, &len, "%h", headings[index].name);
 
   // lineNum
-  char lineNum[numCharAmount(headings[index].lineNum) + 1];
-  sprintf(lineNum, "%d", headings[index].lineNum);
+  char *lineNum = itoa(headings[index].lineNum);
   replaceWith(&output, &len, "%l", lineNum);
+  free(lineNum);
 
   // path
   replaceWith(&output, &len, "%F", headings[index].path);
@@ -152,7 +154,7 @@ void setNext(char *stringIn, char **stringOut, int *pos, int *isStatement,
   }
 
   if (current == '(' || current == ')' || current == '&' || current == '|' ||
-      current == '!') {
+      (current == '!' && '=' != current + 1)) {
     *stringOut = calloc(2, sizeof(char));
     memcpy(*stringOut, &current, 1);
     *pos += 1;
@@ -167,7 +169,8 @@ void setNext(char *stringIn, char **stringOut, int *pos, int *isStatement,
   int nextDelim = *pos;
   // printf("  cur: %c\n", current);
   while (current != '\0' && current != '\'' && current != '&' &&
-         current != '|' && current != '!' && current != '[' && current != ')') {
+         current != '|' && !(current == '!' && '=' == current + 1) &&
+         current != '[' && current != ')') {
     nextDelim++;
     current = stringIn[nextDelim];
     // printf("  cur: %c\n", current);
@@ -199,11 +202,11 @@ void setNext(char *stringIn, char **stringOut, int *pos, int *isStatement,
 
 int setStatmentNode(char *input, int inputLen, struct node *node) {
   int field = -1;
-  char fields[6][6] = {"TAG", "TODO", "SCHED", "DEAD", "PROP", "NAME"};
-  int lens[6] = {3, 4, 5, 4, 4, 4};
+  char *fields[] = {"TAG", "TODO", "SCHED", "DEAD", "PROP", "NAME", "PRIO"};
+  int lens[] = {3, 4, 5, 4, 4, 4, 4};
 
-  for (int i = 0; i < 6; i++) {
-    if (strncmp(input, fields[i], lens[i]) == 0) {
+  for (int i = 0; i < ARRAY_SIZE(fields); i++) {
+    if (strncasecmp(input, fields[i], lens[i]) == 0) {
       // printf("- IS A: %s\n", fields[i]);
       field = i + 1; // see the constants at the top
     }
@@ -217,7 +220,8 @@ int setStatmentNode(char *input, int inputLen, struct node *node) {
   // find match type
   int index = lens[field - 1];
   char current = input[index];
-  while (current != '=' && current != '~' && current != '<' && current != '>') {
+  while (current != '=' && current != '~' && current != '<' && current != '>' &&
+         current != '!') {
     // printf(" curr; %c\n", current);
     index++;
     current = input[index];
@@ -241,6 +245,8 @@ int setStatmentNode(char *input, int inputLen, struct node *node) {
     node->matchType = contains;
   else if (current == '=')
     node->matchType = exact;
+  else if (current == '!')
+    node->matchType = noteq;
   else if (current == '<')
     node->matchType =
         lesserOrEq + offset; // so that "<" and "<=" can be distinguished
@@ -281,7 +287,7 @@ int countNodes(char *input) {
     if (isStatement == 1) {
       isStatement = 0;
       if (nextLen < 7)
-        breakDueToInvalidInput("[c] too short for valid syntax");
+        breakDueToInvalidInput("too short for valid syntax");
       amount++;
     } else if (next != NULL) { // should be a operator or bracket
       if (next[0] != '(' && next[0] != ')') {
@@ -498,6 +504,8 @@ char *getSimpleField(int field, struct headingMeta *heading) {
     return heading->deadline;
   } else if (field == scheduled) {
     return heading->scheduled;
+  } else if (field == prio) {
+    return itoa(heading->prioLvl);
   }
   return NULL;
 }
@@ -506,6 +514,10 @@ int matchNum(long this, long should, int matchType) {
   // printf("%d this: %ld should: %ld\n", matchType, this, should);
   if (matchType == exact) {
     if (this == should) {
+      return 1;
+    }
+  } else if (matchType == noteq) {
+    if (this != should) {
       return 1;
     }
   } else if (matchType == greaterOrEq) {
@@ -525,6 +537,7 @@ int matchNum(long this, long should, int matchType) {
       return 1;
     }
   }
+  // printf("--womp\n");
   return 0;
 }
 
@@ -536,6 +549,10 @@ int matchString(char *this, char *should, int matchType) {
   } else if (matchType == contains) {
     char *pos = strstr(this, should);
     if (pos != NULL) {
+      return 1;
+    }
+  } else if (matchType == noteq) {
+    if (strcmp(this, should) != 0) {
       return 1;
     }
   }
@@ -606,10 +623,25 @@ void check(int *result, int field, char *value, int matchType) {
     // check simple string values
     if (field != property && field != tag) {
       char *headingVal = getSimpleField(field, &headings[i]);
-      if (headingVal == NULL)
+      if (headingVal == NULL) {
+        // since notes that dont have a value should be matched when using !=
+        // eg. "sched != tdy" -> notes with (null) scheduling should also be
+        // matched
+        if (matchType == noteq)
+          result[i] = 1;
         continue;
+      }
 
-      if (field == scheduled || field == deadline) {
+      if (field == prio) {
+        long valNum = getPrioLvl(val[0]);
+        long heading = atoi(headingVal);
+        result[i] = matchNum(heading, valNum, matchType);
+
+        // since it has been allocated by itoa in getSimpleField()
+        free(headingVal);
+        headingVal = NULL;
+
+      } else if (field == scheduled || field == deadline) {
         long headingNumVal = 0;
         long valNum = -1;
         if (field == scheduled)
@@ -627,11 +659,8 @@ void check(int *result, int field, char *value, int matchType) {
         }
 
         result[i] = matchNum(headingNumVal, valNum, matchType);
-      } else if (matchType == exact || matchType == contains) {
+      } else { // match rest with String
         result[i] = matchString(headingVal, val, matchType);
-        // printf("|%s| = |%s|\n", headingVal, val);
-      } else { // can only match other fields with exact or conatins
-        result[i] = 0;
       }
 
     } else {
