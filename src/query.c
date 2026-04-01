@@ -27,6 +27,7 @@ const int deadline = 4;
 const int property = 5;
 const int name = 6;
 const int prio = 7;
+const int path = 8;
 // matchTypes constants
 const int exact = 1;       // ==
 const int contains = 2;    // ~=
@@ -202,8 +203,9 @@ void setNext(char *stringIn, char **stringOut, int *pos, int *isStatement,
 
 int setStatmentNode(char *input, int inputLen, struct node *node) {
   int field = -1;
-  char *fields[] = {"TAG", "TODO", "SCHED", "DEAD", "PROP", "NAME", "PRIO"};
-  int lens[] = {3, 4, 5, 4, 4, 4, 4};
+  char *fields[] = {"TAG",  "TODO", "SCHED", "DEAD",
+                    "PROP", "NAME", "PRIO",  "PATH"};
+  int lens[] = {3, 4, 5, 4, 4, 4, 4, 4};
 
   for (int i = 0; i < ARRAY_SIZE(fields); i++) {
     if (strncasecmp(input, fields[i], lens[i]) == 0) {
@@ -504,6 +506,8 @@ char *getSimpleField(int field, struct headingMeta *heading) {
     return heading->deadline;
   } else if (field == scheduled) {
     return heading->scheduled;
+  } else if (field == path) {
+    return heading->path;
   } else if (field == prio) {
     return itoa(heading->prioLvl);
   }
