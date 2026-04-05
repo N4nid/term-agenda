@@ -1,5 +1,6 @@
 #include "scan.c"
 #include "util.h"
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,30 +47,78 @@ void printCustomOutput(int index) {
   // do the simple replacements
   char *output = strdup(customOutput);
   size_t len = strlen(output);
+  struct headingMeta this = headings[index];
 
   // heading (name)
-  replaceWith(&output, &len, "%h", headings[index].name);
+  replaceWith(&output, &len, "%h", this.name);
+
+  // "pure" heading
+  if (strstr(output, "%H") != NULL) {
+    size_t hlen = strlen(this.name);
+    char *heading;
+    if (this.tags != NULL) {
+      int pos = -1;
+      // find pos of first tag
+      // fails with a heading like: HEADING :notatag: :tag:
+      // but honestly WHO tf does that
+      for (int i = 0; i < hlen - 1; i++) {
+        if (pos == -1 && this.name[i] == ' ' && this.name[i + 1] == ':') {
+          pos = i;
+        } else if (pos != -1 && this.name[i + 1] == ' ') {
+          pos = -1;
+        } else if (pos != -1 && this.name[i + 1] == ':') {
+          break;
+        }
+      }
+
+      // becuz of inherited tags there might not be an actual tag in the heading
+      if (pos != -1) {
+        heading = calloc(pos + 1, 1);
+        strncpy(heading, this.name, pos);
+        hlen = pos;
+      } else {
+        heading = strdup(this.name);
+      }
+    } else {
+      heading = strdup(this.name);
+    }
+
+    if (this.todokwd != NULL) {
+      replaceWith(&heading, &hlen, this.todokwd, "");
+    }
+    if (this.priority != NULL) {
+      replaceWith(&heading, &hlen, this.priority, "");
+    }
+    int i = 0;
+    while (heading[i] == ' ') { // remove leading spaces
+      i++;
+    }
+    char *h = heading + i;
+
+    replaceWith(&output, &len, "%H", h);
+    free(heading);
+  }
 
   // lineNum
-  char *lineNum = itoa(headings[index].lineNum);
+  char *lineNum = itoa(this.lineNum);
   replaceWith(&output, &len, "%l", lineNum);
   free(lineNum);
 
   // path
-  replaceWith(&output, &len, "%F", headings[index].path);
+  replaceWith(&output, &len, "%F", this.path);
 
   // filename
-  replaceWith(&output, &len, "%f", basename(headings[index].path));
+  replaceWith(&output, &len, "%f", basename(this.path));
 
   // scheduled/deadline
-  replaceWith(&output, &len, "%s", emptyIfNull(headings[index].scheduled));
-  replaceWith(&output, &len, "%d", emptyIfNull(headings[index].deadline));
+  replaceWith(&output, &len, "%s", emptyIfNull(this.scheduled));
+  replaceWith(&output, &len, "%d", emptyIfNull(this.deadline));
 
   // priority
-  replaceWith(&output, &len, "%p", emptyIfNull(headings[index].priority));
+  replaceWith(&output, &len, "%p", emptyIfNull(this.priority));
 
   // TODO kwd
-  replaceWith(&output, &len, "%t", emptyIfNull(headings[index].todokwd));
+  replaceWith(&output, &len, "%t", emptyIfNull(this.todokwd));
 
   printf("%s\n", output);
   free(output);
