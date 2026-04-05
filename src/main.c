@@ -117,8 +117,7 @@ void setDefaults() {
   todo_keywordsCSV = strdup(kwds);
   char *format = "%Y-%m-%d";
   time_format = strdup(format);
-  //  char *output = "%l %h -> %F";
-  //  customOutput = copy2str(output);
+  max_threads = 100;
 }
 
 void freeAfterSearch() {

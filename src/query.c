@@ -271,7 +271,7 @@ int setStatmentNode(char *input, int inputLen, struct node *node) {
 void breakDueToInvalidInput(char *msg) {
   printf("\n! INVALID INPUT !\n");
   printf("! %s !\n", msg);
-  exit(1);
+  exit(-1);
 }
 
 int countNodes(char *input) {

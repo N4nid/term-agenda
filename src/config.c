@@ -19,6 +19,7 @@ int isSetTodoKWDS = 0;
 int isSetMaxThreads = 0;
 int isSetHiddenDirInclusion = 0;
 int isSetTimeFormat = 0;
+int isSetOutputFormat = 0;
 
 size_t searchAmount = 0;
 char **searchString = NULL;
@@ -165,11 +166,11 @@ void *addFiles(void *_path) {
 
     if (sfileInfo.st_mode & S_IFDIR) { // is a dir
       printf("-- could not open dir ! --\n");
-      exit(0);
+      exit(-1);
     } else {
       filesAmount = 1;
       if (hasCountedFiles) {
-        printf("HERE\n");
+        // printf("HERE\n");
         char *extension = path;
         extension = extension + (pathLen - 4);
 
@@ -336,13 +337,13 @@ void setConfigValue(char *optionString) {
     free(optionValue);
     optionValue = NULL;
     break;
-  case 9: // output-format
-          // if (isSetHiddenDirInclusion == 0) { // has not been set by cmd args
-          // }
+  case 9:                         // output-format
+    if (isSetOutputFormat == 0) { // has not been set by cmd args
+      if (customOutput != NULL)
+        free(customOutput);
+      customOutput = strdup(optionValue);
+    }
 
-    if (customOutput != NULL)
-      free(customOutput);
-    customOutput = strdup(optionValue);
     free(optionValue);
     optionValue = NULL;
     break;
@@ -528,6 +529,7 @@ void readConfig() {
   if (configPath == NULL) {
     printf("[!] error opening config file\n");
     printf("[!] configPath is NULL");
+    exit(-1);
   }
   FILE *file = fopen(configPath, "r");
   char *line = NULL;
@@ -544,6 +546,7 @@ void readConfig() {
   if (file == NULL) {
     printf("[!] error opening config file\n");
     fclose(file);
+    exit(-1);
   }
 
   lineLen = getline(&line, &size, file);
@@ -620,7 +623,7 @@ void readConfig() {
 
 void breakDueToMissingArg() {
   printf("argument is missing\n");
-  exit(0);
+  exit(-1);
 }
 
 void printHelp() {
@@ -629,10 +632,12 @@ commandline options:\n\
 note that they all override settings specified in the config file\n\
 -q <query> syntax is detailed below\n\
 -Q <custom query> use a query defined in the config\n\
--p <path to org file[s]>\n\
+-p path to org file[s]\n\
+-c path to config file\n\
 -a include \"hidden\" dirs (dir starting with a dot)\n\
    has to be set before -p since it whould otherwise not have any effect\n\
--f format to use when parsing dates\n\
+-df format to use when parsing dates\n\
+-of format of the output\n\
 -t set the todo keywords which should be recognized\n\
    there must not be a space after or before the comma\"\n\
    fe.: -t \"TODO,DONE,STRT\"\n\
@@ -652,6 +657,8 @@ fields:\n\
   SCHED (provide date in the same format as specified in the config option)\n\
   DEAD\n\
   PROP\n\
+  PRIO\n\
+  PATH\n\
 \n\
 match types:\n\
   not equal: !=\n\
@@ -751,13 +758,11 @@ void setArgumentOptions(int argc, char *argv[]) {
       i++;
       isSetTodoKWDS = 1;
 
-    } else if (strncmp("-f", argv[i], 3) == 0) {
+    } else if (strncmp("-df", argv[i], 3) == 0) {
       if (argv[i + 1] == NULL)
         breakDueToMissingArg();
 
-      int len = strlen(argv[i + 1]);
-      time_format = calloc(len + 2, sizeof(char));
-      memcpy(time_format, argv[i + 1], len);
+      time_format = strdup(argv[i + 1]);
       isSetTimeFormat = 1;
       i++;
 
@@ -785,16 +790,35 @@ void setArgumentOptions(int argc, char *argv[]) {
                "VALUE ! *\n*********************************\n");
         exit(-1);
       }
+      i++;
 
     } else if (strncmp("-a", argv[i], 3) == 0) {
       isSetHiddenDirInclusion = 1;
       includeHiddenDirs = 1;
+    } else if (strncmp("-of", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+
+      customOutput = strdup(argv[i + 1]);
+      isSetOutputFormat = 1;
+      i++;
+    } else if (strncmp("-c", argv[i], 3) == 0) {
+      if (argv[i + 1] == NULL)
+        breakDueToMissingArg();
+
+      if (configPath != NULL) {
+        free(configPath);
+      }
+
+      configPath = strdup(argv[i + 1]);
+      configPath = fixPath(configPath);
+      i++;
     }
   }
 
-  for (int i = 0; i < searchAmount; i++) {
-    // printf("-- search: %s", searchString[i]);
-  }
+  // for (int i = 0; i < searchAmount; i++) {
+  //  printf("-- search: %s", searchString[i]);
+  //}
 }
 
 void createConfig() {
