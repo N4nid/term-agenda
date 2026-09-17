@@ -654,7 +654,7 @@ fields:\n\
   TAG\n\
   TODO\n\
   NAME (the heading name)\n\
-  SCHED (provide date in the same format as specified in the config option)\n\
+  SCHED (date or now,tdy,tmr,ytd)\n\
   DEAD\n\
   PROP\n\
   PRIO\n\

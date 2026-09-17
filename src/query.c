@@ -99,6 +99,26 @@ void printCustomOutput(int index) {
     free(heading);
   }
 
+  // tags
+  if (strstr(output, "%T") != NULL && this.tagsAmount > 0) {
+    // calculate size
+    size_t tlen = 1; // because of the ending ":" -> :tag2:tag1:
+    for (int i = 0; i < this.tagsAmount; i++) {
+      tlen += strlen(this.tags[i]) + 1;
+      // printf("(%ld) |%s|\n", len, this.tags[i]);
+    }
+    char *tags = calloc(tlen + 1, sizeof(char));
+
+    for (int i = 0; i < this.tagsAmount; i++) {
+      strcat(tags, ":");
+      strcat(tags, this.tags[i]);
+    }
+    strcat(tags, ":");
+
+    replaceWith(&output, &len, "%T", tags);
+    free(tags);
+  }
+
   // lineNum
   char *lineNum = itoa(this.lineNum);
   replaceWith(&output, &len, "%l", lineNum);
